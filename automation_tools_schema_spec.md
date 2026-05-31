@@ -81,6 +81,9 @@ The system serves as the authoritative source of record for tooling decisions in
 | `Environment` | A named compute environment (OS + platform combination) |
 | `ToolEnvironmentSupport` | Install method and command for a Tool in a given Environment |
 | `ToolCategoryMap` | Many-to-many join between Tool and ToolCategory |
+| `NafFunctionMap` | One of 6 NAF framework functional roles assigned to a tool |
+| `DataSource` | A catalog of sources from which tools are discovered or submitted |
+| `ToolSourceMap` | Many-to-many join between Tool and DataSource (provenance) |
 
 ### 2.2 Relationships
 
@@ -90,6 +93,8 @@ The system serves as the authoritative source of record for tooling decisions in
 - A **Tool** integrates with zero or more other **Tools** (via `ToolIntegration`, self-referential on `tools`).
 - A **Tool** depends on zero or more other **Tools** (via `ToolDependency`, self-referential on `tools`).
 - A **Tool** is supported in zero or more **Environments** (via `ToolEnvironmentSupport`).
+- A **Tool** is assigned zero or more **NafFunctions** (via `tool_naf_function_map`).
+- A **Tool** is referenced by one or more **DataSources** (via `tool_source_map`). Provenance is required: every tool in the registry must trace back to at least one source.
 
 ### 2.3 ER Diagram
 
@@ -178,6 +183,27 @@ erDiagram
         timestamp updated_at
     }
 
+    tool_naf_function_map {
+        uuid tool_id FK
+        naf_function naf_function
+    }
+
+    data_sources {
+        uuid id PK
+        string name
+        string slug UK
+        string url
+        text description
+        timestamp created_at
+    }
+
+    tool_source_map {
+        uuid tool_id FK
+        uuid source_id FK
+        text notes
+        timestamp created_at
+    }
+
     tools ||--o{ tool_category_map : "categorized via"
     tool_categories ||--o{ tool_category_map : "applied to"
     tools ||--o{ tool_versions : "has"
@@ -188,6 +214,9 @@ erDiagram
     tools ||--o{ tool_dependencies : "depended on via"
     tools ||--o{ tool_environment_support : "supported in"
     environments ||--o{ tool_environment_support : "hosts"
+    tools ||--o{ tool_naf_function_map : "classified via"
+    tools ||--o{ tool_source_map : "sourced via"
+    data_sources ||--o{ tool_source_map : "references"
 ```
 
 ---
@@ -278,6 +307,16 @@ CREATE TYPE install_method AS ENUM (
     'source',
     'ansible_galaxy',
     'manual'
+);
+
+-- NAF framework function classification
+CREATE TYPE naf_function AS ENUM (
+    'presentation',   -- UI, CLI, API — human/machine interface layer
+    'intent',         -- Desired state: SoT, IPAM, config templates, policy
+    'observability',  -- Actual state storage and analysis
+    'collector',      -- Gathers current state from devices (SSH, gNMI, telemetry)
+    'orchestration',  -- Coordinates workflows and event-driven automation
+    'executor'        -- Applies changes directly to network devices
 );
 ```
 
@@ -621,6 +660,97 @@ CREATE TRIGGER trg_tes_updated_at
 
 ---
 
+### 3.11 `tool_naf_function_map`
+
+Maps tools to their NAF framework functional roles. A tool may fill multiple roles (e.g., SuzieQ is both `collector` and `observability`).
+
+```sql
+CREATE TABLE tool_naf_function_map (
+    tool_id      UUID          NOT NULL REFERENCES tools(id) ON DELETE CASCADE,
+    naf_function naf_function  NOT NULL,
+
+    PRIMARY KEY (tool_id, naf_function)
+);
+
+CREATE INDEX idx_tool_naf_function_map_function ON tool_naf_function_map (naf_function);
+```
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `tool_id` | `UUID` | FK → `tools.id`, CASCADE DELETE, PK composite | The tool |
+| `naf_function` | `naf_function` enum | NOT NULL, PK composite | The NAF functional role |
+
+---
+
+### 3.12 `data_sources`
+
+Catalog of sources from which tools are discovered or submitted. Used for data provenance.
+
+```sql
+CREATE TABLE data_sources (
+    id          UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
+    name        VARCHAR(255)    NOT NULL,
+    slug        VARCHAR(255)    NOT NULL,
+    url         VARCHAR(2048),
+    description TEXT,
+    created_at  TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT data_sources_slug_unique UNIQUE (slug),
+    CONSTRAINT data_sources_slug_format CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$')
+);
+```
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | `UUID` | PK | Surrogate key |
+| `name` | `VARCHAR(255)` | NOT NULL | Display name (e.g., "Packet Pushers Open Source List") |
+| `slug` | `VARCHAR(255)` | UNIQUE | URL-safe key (e.g., `packet-pushers`) |
+| `url` | `VARCHAR(2048)` | nullable | URL of the source page or repository |
+| `description` | `TEXT` | nullable | What this source is |
+| `created_at` | `TIMESTAMPTZ` | NOT NULL | |
+
+**Seed sources:**
+
+| Slug | Name | URL |
+|------|------|-----|
+| `packet-pushers` | Packet Pushers Open Source List | https://packetpushers.net/blog/open-source-networking-projects/ |
+| `steinzi` | Steinzi Network Automation Landscape | https://steinzi.com/network-automation-landscape/ |
+| `manual` | Manual / Direct Submission | _(null)_ |
+
+> Slugs on `data_sources` are stable external identifiers and must not change after initial creation. See §7.5.
+
+---
+
+### 3.13 `tool_source_map`
+
+Many-to-many join recording which data sources reference each tool. This is the provenance record: it answers *"how did this tool get into the registry?"*
+
+```sql
+CREATE TABLE tool_source_map (
+    tool_id    UUID         NOT NULL REFERENCES tools(id) ON DELETE CASCADE,
+    source_id  UUID         NOT NULL REFERENCES data_sources(id) ON DELETE RESTRICT,
+    notes      TEXT,
+    created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    PRIMARY KEY (tool_id, source_id)
+);
+
+CREATE INDEX idx_tool_source_map_source ON tool_source_map (source_id);
+```
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `tool_id` | `UUID` | FK → `tools.id`, CASCADE DELETE, PK composite | The tool |
+| `source_id` | `UUID` | FK → `data_sources.id`, **RESTRICT** DELETE, PK composite | The source that listed or provided the tool |
+| `notes` | `TEXT` | nullable | Optional context: page section, citation number, URL fragment |
+| `created_at` | `TIMESTAMPTZ` | NOT NULL | When this association was recorded |
+
+> `ON DELETE RESTRICT` on `source_id` prevents deleting a `data_sources` row while tools still reference it. Provenance records are load-bearing and must not be silently removed.
+
+> **Business rule S1:** Every tool must have at least one `tool_source_map` entry. Enforced by the application layer on `POST /api/v1/tools`. See §7.7.
+
+---
+
 ## 4. Enum & Constant Definitions
 
 ### 4.1 `tool_type`
@@ -715,6 +845,19 @@ These are recommended free-text values for the `os_support` TEXT[] field:
 
 `linux`, `macos`, `windows`, `container`, `alpine`, `freebsd`
 
+### 4.9 `naf_function`
+
+The six functional roles from the Network Automation Framework (NAF). A tool may fulfill multiple roles simultaneously.
+
+| Value | Description | Example Tools |
+|-------|-------------|--------------|
+| `presentation` | Human or machine interface layer — UI, CLI, REST API | Hyperglass, LibreNMS |
+| `intent` | Desired state definition — SoT, IPAM, config templates, policy | Infrahub, NetBox, Nautobot |
+| `observability` | Actual state storage and analysis — metrics, logs, operational queries | SuzieQ, LibreNMS |
+| `collector` | Gathers current device state via SSH, gNMI, SNMP, or streaming telemetry | SuzieQ, Elastiflow |
+| `orchestration` | Coordinates multi-step workflows and event-driven automation | Ansible, Nornir, AWX |
+| `executor` | Applies configuration changes directly to network devices | Netmiko, Scrapli, Ansible |
+
 ---
 
 ## 5. API Specification (Application Layer)
@@ -777,6 +920,20 @@ All responses follow the envelope:
 |--------|------|-------------|
 | `GET` | `/api/v1/capabilities` | Search capabilities across all tools |
 
+#### NAF Framework Functions
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/naf-functions` | List all 6 NAF framework functions with descriptions |
+| `GET` | `/api/v1/naf-functions/{function}/tools` | List tools tagged with a given NAF function |
+
+#### Data Sources
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/sources` | List all registered data sources |
+| `GET` | `/api/v1/sources/{slug}/tools` | List tools discovered from a given source |
+
 ---
 
 ### 5.3 Query Parameters — `GET /api/v1/tools`
@@ -791,6 +948,8 @@ All responses follow the envelope:
 | `category` | string (slug) | Filter by category slug | `?category=network-simulation` |
 | `protocol` | string (enum) | Filter by `protocol_support` value | `?protocol=gNMI` |
 | `environment` | string (slug) | Filter by environment slug | `?environment=macos-arm64` |
+| `naf_function` | string (enum) | Filter by NAF framework function | `?naf_function=executor` |
+| `source` | string (slug) | Filter by data source slug | `?source=steinzi` |
 | `sort` | string | Sort field (default: `name`) | `?sort=updated_at` |
 | `order` | `asc\|desc` | Sort direction (default: `asc`) | `?order=desc` |
 
@@ -845,6 +1004,21 @@ JOIN tools t ON t.id = tes.tool_id
 JOIN environments e ON e.id = tes.environment_id
 WHERE t.slug = 'containerlab'
   AND e.slug = 'ubuntu-2204';
+
+-- Q6: All active tools with a specific NAF framework function
+SELECT t.slug, t.name, t.tool_type
+FROM tools t
+JOIN tool_naf_function_map m ON m.tool_id = t.id
+WHERE m.naf_function = 'executor'
+  AND t.status = 'active'
+ORDER BY t.name;
+
+-- Q7: All data sources for a tool (provenance lookup)
+SELECT ds.name, ds.url, tsm.notes, tsm.created_at
+FROM tool_source_map tsm
+JOIN data_sources ds ON ds.id = tsm.source_id
+JOIN tools t ON t.id = tsm.tool_id
+WHERE t.slug = 'suzieq';
 ```
 
 ---
@@ -865,11 +1039,20 @@ WHERE t.slug = 'containerlab'
     "status": "active",
     "latest_version": "4.4.0",
     "categories": ["scripting", "configuration-management"],
+    "naf_functions": ["executor"],
     "capabilities": [
       {
         "capability": "device-config-push",
         "protocol_support": ["SSH"],
         "os_support": ["linux", "macos"]
+      }
+    ],
+    "sources": [
+      {
+        "slug": "steinzi",
+        "name": "Steinzi Network Automation Landscape",
+        "url": "https://steinzi.com/network-automation-landscape/",
+        "notes": "Listed under Management – Automation"
       }
     ],
     "created_at": "2024-01-01T00:00:00Z",
@@ -1100,6 +1283,112 @@ SELECT m.id, i.id, 'api',
   'MCP server queries Infrahub GraphQL/gRPC API to expose SoT data to AI agents.'
 FROM tools m, tools i
 WHERE m.slug = 'network-automation-mcp' AND i.slug = 'infrahub';
+
+
+-- ============================================================
+-- SEED: data_sources
+-- ============================================================
+INSERT INTO data_sources (name, slug, url, description)
+VALUES
+  ('Packet Pushers Open Source List',
+   'packet-pushers',
+   'https://packetpushers.net/blog/open-source-networking-projects/',
+   'Curated list of open source networking projects maintained by Packet Pushers.'),
+
+  ('Steinzi Network Automation Landscape',
+   'steinzi',
+   'https://steinzi.com/network-automation-landscape/',
+   'Community-maintained landscape of network automation tools and frameworks.'),
+
+  ('Manual / Direct Submission',
+   'manual',
+   NULL,
+   'Tool was submitted directly to the registry without a tracked external source.');
+
+
+-- ============================================================
+-- SEED: tool_naf_function_map
+-- NAF function assignments derived from tools.yml framework_functions
+-- ============================================================
+-- Netmiko: executes config changes over SSH
+INSERT INTO tool_naf_function_map (tool_id, naf_function)
+SELECT id, 'executor' FROM tools WHERE slug = 'netmiko';
+
+-- Ansible: orchestrates workflows and executes changes
+INSERT INTO tool_naf_function_map (tool_id, naf_function)
+SELECT id, f FROM tools, (VALUES ('orchestration'), ('executor')) AS v(f)
+WHERE slug = 'ansible';
+
+-- Jinja2: intent layer — renders config templates
+INSERT INTO tool_naf_function_map (tool_id, naf_function)
+SELECT id, 'intent' FROM tools WHERE slug = 'jinja2';
+
+-- SuzieQ: collects state from devices and provides observability queries
+INSERT INTO tool_naf_function_map (tool_id, naf_function)
+SELECT id, f FROM tools, (VALUES ('collector'), ('observability')) AS v(f)
+WHERE slug = 'suzieq';
+
+-- containerlab: orchestrates lab topologies
+INSERT INTO tool_naf_function_map (tool_id, naf_function)
+SELECT id, 'orchestration' FROM tools WHERE slug = 'containerlab';
+
+-- Infrahub: intent layer — source of truth and desired state
+INSERT INTO tool_naf_function_map (tool_id, naf_function)
+SELECT id, 'intent' FROM tools WHERE slug = 'infrahub';
+
+-- Network Automation MCP Server: presentation layer — AI/agent interface
+INSERT INTO tool_naf_function_map (tool_id, naf_function)
+SELECT id, 'presentation' FROM tools WHERE slug = 'network-automation-mcp';
+
+-- Nornir: orchestrates tasks and executes them against devices
+INSERT INTO tool_naf_function_map (tool_id, naf_function)
+SELECT id, f FROM tools, (VALUES ('orchestration'), ('executor')) AS v(f)
+WHERE slug = 'nornir';
+
+
+-- ============================================================
+-- SEED: tool_source_map
+-- ============================================================
+-- All seed tools appear in the Steinzi landscape
+INSERT INTO tool_source_map (tool_id, source_id, notes)
+SELECT t.id, ds.id, 'Listed in tools.yml — Management – Automation section'
+FROM tools t, data_sources ds
+WHERE t.slug = 'netmiko' AND ds.slug = 'steinzi';
+
+INSERT INTO tool_source_map (tool_id, source_id, notes)
+SELECT t.id, ds.id, 'Listed in tools.yml — Management – Automation section'
+FROM tools t, data_sources ds
+WHERE t.slug = 'ansible' AND ds.slug = 'steinzi';
+
+INSERT INTO tool_source_map (tool_id, source_id, notes)
+SELECT t.id, ds.id, 'Listed in tools.yml — Management – Automation section'
+FROM tools t, data_sources ds
+WHERE t.slug = 'jinja2' AND ds.slug = 'steinzi';
+
+INSERT INTO tool_source_map (tool_id, source_id, notes)
+SELECT t.id, ds.id, 'Listed in tools.yml — Monitoring – Observability section'
+FROM tools t, data_sources ds
+WHERE t.slug = 'suzieq' AND ds.slug = 'steinzi';
+
+INSERT INTO tool_source_map (tool_id, source_id, notes)
+SELECT t.id, ds.id, 'Listed in tools.yml — Labbing section'
+FROM tools t, data_sources ds
+WHERE t.slug = 'containerlab' AND ds.slug = 'steinzi';
+
+INSERT INTO tool_source_map (tool_id, source_id, notes)
+SELECT t.id, ds.id, 'Listed in tools.yml — Management – DCIM/IPAM/SoT section'
+FROM tools t, data_sources ds
+WHERE t.slug = 'infrahub' AND ds.slug = 'steinzi';
+
+INSERT INTO tool_source_map (tool_id, source_id, notes)
+SELECT t.id, ds.id, 'Added as example MCP agent — direct submission'
+FROM tools t, data_sources ds
+WHERE t.slug = 'network-automation-mcp' AND ds.slug = 'manual';
+
+INSERT INTO tool_source_map (tool_id, source_id, notes)
+SELECT t.id, ds.id, 'Listed in tools.yml — Management – Automation section'
+FROM tools t, data_sources ds
+WHERE t.slug = 'nornir' AND ds.slug = 'steinzi';
 ```
 
 ---
@@ -1118,6 +1407,9 @@ WHERE m.slug = 'network-automation-mcp' AND i.slug = 'infrahub';
 | `tool_dependencies` | `(tool_id, depends_on_tool_id, dependency_type)` UNIQUE | No duplicate dependency edges of the same type |
 | `tool_environment_support` | `(tool_id, environment_id)` PRIMARY KEY | One install record per tool/env pair |
 | `tool_category_map` | `(tool_id, category_id)` PRIMARY KEY | No duplicate category assignments |
+| `tool_naf_function_map` | `(tool_id, naf_function)` PRIMARY KEY | No duplicate NAF function assignments per tool |
+| `data_sources` | `slug` UNIQUE | No two sources share a slug |
+| `tool_source_map` | `(tool_id, source_id)` PRIMARY KEY | No duplicate source assignments per tool |
 
 ### 7.2 Referential Integrity
 
@@ -1163,6 +1455,17 @@ experimental → active | archived
 deprecated  → archived
 archived    → (terminal — no transitions out without admin override)
 ```
+
+### 7.7 Data Provenance Rules
+
+**Rule S1 — Every tool must have at least one data source:**
+The application layer MUST reject `POST /api/v1/tools` requests where `sources` is absent or empty. A tool with no `tool_source_map` entries is invalid. This cannot be enforced at the DB level via a `CHECK` constraint on a join table, so it is the API layer's responsibility to validate before committing.
+
+**Rule S2 — Data sources are deletion-restricted:**
+The `ON DELETE RESTRICT` FK on `tool_source_map.source_id` prevents removing a `data_sources` row while any tool references it. To remove a source, all `tool_source_map` entries for that source must be reassigned or deleted first — this is an intentional safety gate to prevent silent provenance loss.
+
+**Rule S3 — Slug immutability applies to `data_sources`:**
+Once a `data_sources` slug is published, it must not change. It is a stable external identifier used in `GET /api/v1/sources/{slug}/tools` and the `?source=` query parameter. See §7.5 for the general slug immutability policy.
 
 ---
 
