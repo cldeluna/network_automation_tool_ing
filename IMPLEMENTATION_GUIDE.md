@@ -247,3 +247,65 @@ The next step is building the REST API (`/api/v1/tools`, etc.) using **FastAPI**
 ```bash
 uv add fastapi uvicorn
 ```
+
+---
+
+## Part 6 — Supabase MCP Server (Optional but Recommended)
+
+The Supabase MCP server lets Claude interact with your database directly — running SQL, inspecting tables, applying schema changes — without leaving the conversation. This is useful for running the DDL and seed steps above, and for debugging queries later.
+
+### Prerequisites
+
+- Node.js installed (check: `node --version`)
+- A Supabase **Personal Access Token**
+- Your Supabase **Project ID**
+
+### Step 14 — Get your Personal Access Token
+
+1. Go to [supabase.com](https://supabase.com) and log in
+2. Click your avatar (top right) → **Account**
+3. Click **Access Tokens** in the left sidebar
+4. Click **Generate new token**
+5. Give it a name (e.g., `claude-code`) and click **Generate**
+6. Copy the token — it starts with `sbp_`
+7. Add it to your `.env` file:
+   ```
+   SUPABASE_ACCESS_TOKEN=sbp_...
+   ```
+
+### Step 15 — Get your Project ID
+
+Your project ID is visible in the URL when you are in your Supabase project dashboard:
+
+```
+https://supabase.com/dashboard/project/[YOUR-PROJECT-ID]
+```
+
+Copy the `[YOUR-PROJECT-ID]` portion (it looks like `abcdefghijklmnop`).
+
+### Step 16 — Configure the MCP server in Claude Code
+
+MCP servers are configured in a `.mcp.json` file at the project root (not in `.claude/settings.json`). A template has already been created in this project. Open `.mcp.json` and replace the two placeholder values:
+
+```json
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--project-ref",
+        "YOUR-PROJECT-ID"          ← replace with value from Step 15
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "sbp_YOUR-TOKEN-HERE"   ← replace with token from Step 14
+      }
+    }
+  }
+}
+```
+
+> **Important:** `.mcp.json` is listed in `.gitignore` — it contains your personal access token and must not be committed. Each developer fills in their own copy.
+
+After saving, restart Claude Code. You should see Supabase tools available (run SQL, list tables, etc.).

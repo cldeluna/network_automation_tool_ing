@@ -1,0 +1,906 @@
+framework_function_category:
+  - Presentation
+  - Intent
+  - Observability
+  - Orchestration
+  - Collector
+  - Executor
+
+tools:
+  BGP – Daemons:
+    - name: ExaBGP
+      url: https://github.com/Exa-Networks/exabgp
+      notes: Scriptable BGP-based BGP speaker used as an SDN/control-plane tool in large deployments. [web:2]
+      framework_functions:
+        - Executor
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: GoBGP
+      url: https://github.com/osrg/gobgp
+      notes: BGP implementation in Go designed for modern, programmable environments. [web:2]
+      framework_functions:
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  BGP – Looking Glasses:
+    - name: Alice-LG
+      url: https://github.com/alice-lg/alice-lg
+      notes: Web BGP looking glass consuming state from backends like birdwatcher, BIRD, and GoBGP. [web:2]
+      framework_functions:
+        - Presentation
+        - Observability
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Hyperglass
+      url: https://github.com/thatmattlove/hyperglass
+      notes: Modern, multi-target looking glass application intended to make deployment simple for any AS. [web:2]
+      framework_functions:
+        - Presentation
+        - Observability
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  BGP – RKPI Tools:
+    - name: Routinator
+      url: https://nlnetlabs.nl/projects/routing/routinator/
+      notes: Rust-based RPKI relying party that validates ROAs and serves data to routers. [web:2]
+      framework_functions:
+        - Collector
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: RTRTR
+      url: https://nlnetlabs.nl/projects/routing/rtrtr/
+      notes: RPKI data proxy that aggregates validated payloads and redistributes them to caching RTR servers. [web:2]
+      framework_functions:
+        - Collector
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: StayRTR
+      url: https://github.com/bgp/stayrtr
+      notes: Go-based implementation of the RPKI-to-Router protocol suitable for serving router clients. [web:2]
+      framework_functions:
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  BGP – Session Monitoring & Management:
+    - name: BGPAlerter
+      url: https://github.com/nttgin/BGPalerter
+      notes: Self-configuring real-time BGP monitoring tool that consumes public routing feeds and sends alerts. [web:2]
+      framework_functions:
+        - Observability
+        - Collector
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Peering Manager
+      url: https://github.com/peering-manager/peering-manager
+      notes: Source of truth and configuration manager for external BGP sessions and IXPs. [web:2]
+      framework_functions:
+        - Intent
+        - Orchestration
+        - Presentation
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  Cloud Native Networking:
+    - name: Calico
+      url: https://www.tigera.io/tigera-products/calico/
+      notes: Networking and network policy solution for containers, VMs, and bare-metal workloads across many platforms. [web:2]
+      framework_functions:
+        - Executor
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Cilium
+      url: https://cilium.io/
+      notes: eBPF-based cloud native networking and security platform providing connectivity and deep observability. [web:2]
+      framework_functions:
+        - Executor
+        - Observability
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Envoy
+      url: https://www.envoyproxy.io/
+      notes: High-performance L4/L7 proxy and service mesh data plane for microservices environments. [web:2]
+      framework_functions:
+        - Executor
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Hubble
+      url: https://github.com/cilium/hubble
+      notes: Distributed observability platform built on Cilium and eBPF for service and network visibility. [web:2]
+      framework_functions:
+        - Observability
+        - Presentation
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Loxilb
+      url: https://github.com/loxilb-io/loxilb
+      notes: Cloud-native eBPF-based load balancer targeting on-prem, public cloud, and hybrid Kubernetes deployments. [web:2]
+      framework_functions:
+        - Executor
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Metallb
+      url: https://github.com/metallb/metallb
+      notes: Load balancer implementation for bare-metal Kubernetes clusters using standard routing protocols. [web:2]
+      framework_functions:
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Multus-CNI
+      url: https://github.com/k8snetworkplumbingwg/multus-cni
+      notes: CNI plugin that allows pods to attach to multiple network interfaces in Kubernetes. [web:2]
+      framework_functions:
+        - Orchestration
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  Developer Tools:
+    - name: DPDK
+      url: https://www.dpdk.org/
+      notes: User-space packet processing framework for high-speed networking on common CPU architectures. [web:2]
+      framework_functions:
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: eBPF
+      url: https://ebpf.io/
+      notes: In-kernel sandboxed execution mechanism used to extend kernel networking and observability safely. [web:2]
+      framework_functions:
+        - Executor
+        - Observability
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Gribi
+      url: https://github.com/openconfig/gribi
+      notes: gRPC-based interface for programming RIB entries based on OpenConfig AFT models. [web:2]
+      framework_functions:
+        - Orchestration
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: gRPC
+      url: http://www.grpc.io/
+      notes: Language-agnostic RPC framework widely used between controllers and network OSes. [web:2]
+      framework_functions:
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: JSON
+      url: https://www.json.org/json-en.html
+      notes: Text-based data interchange format built on key–value pairs and lists, used throughout automation APIs. [web:2]
+      framework_functions:
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Kne
+      url: https://github.com/openconfig/kne
+      notes: Kubernetes-based network emulation framework for building complex multi-vendor topologies. [web:2]
+      framework_functions:
+        - Orchestration
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Libyang
+      url: https://github.com/CESNET/libyang
+      notes: C library and toolkit for parsing and working with YANG data models. [web:2]
+      framework_functions:
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: NETCONF
+      url: https://www.rfc-editor.org/rfc/rfc6241
+      notes: XML RPC-based protocol for configuration and state management of network devices. [web:2]
+      framework_functions:
+        - Orchestration
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Netmap
+      url: https://github.com/luigirizzo/netmap
+      notes: High-speed user-space packet I/O framework with VALE in-kernel virtual switch. [web:2]
+      framework_functions:
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Netopeer
+      url: https://github.com/CESNET/netopeer
+      notes: Suite of NETCONF tools for building clients and servers using libnetconf. [web:2]
+      framework_functions:
+        - Orchestration
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Netutils
+      url: https://github.com/networktocode/netutils
+      notes: Python helpers for common network automation tasks such as ASN conversion and interface normalization. [web:2]
+      framework_functions:
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: OpenBCM
+      url: https://github.com/Broadcom-Network-Switching-Software/OpenBCM
+      notes: Broadcom switch API and driver code for programming multiple ASIC families. [web:2]
+      framework_functions:
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: OpenConfig
+      url: https://www.openconfig.net/
+      notes: Vendor-neutral data models and tooling for standardized network device management. [web:2]
+      framework_functions:
+        - Intent
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: OpenFlow
+      url: https://www.opennetworking.org/ja/sdn-resources-ja/onf-specifications/openflow
+      notes: Protocol to remotely program forwarding tables; now primarily of historical interest in SDN. [web:2]
+      framework_functions:
+        - Orchestration
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: OpenZiti
+      url: https://openziti.io/
+      notes: Zero trust overlay networking platform with SDKs to embed secure connectivity into applications. [web:2]
+      framework_functions:
+        - Executor
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: QUIC Implementations List
+      url: https://github.com/quicwg/base-drafts/wiki/Implementations
+      notes: Community-maintained catalog of QUIC and HTTP/3 implementations, some proprietary. [web:2]
+      framework_functions:
+        - Collector
+        - Presentation
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Vagrant
+      url: https://www.vagrantup.com/
+      notes: Tool for defining and building reproducible virtual development environments. [web:2]
+      framework_functions:
+        - Orchestration
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: VPP
+      url: https://github.com/FDio/vpp
+      notes: Vector Packet Processing framework providing high-performance virtual switching and routing. [web:2]
+      framework_functions:
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: vSSH
+      url: https://github.com/yahoo/vssh
+      notes: Go library to manage large numbers of SSH connections with high-level automation APIs. [web:2]
+      framework_functions:
+        - Executor
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: XDP
+      url: https://www.iovisor.org/technology/xdp
+      notes: In-kernel programmable high-speed data path hook as part of the IO Visor project. [web:2]
+      framework_functions:
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  Labbing:
+    - name: BGPLabs
+      url: https://bgplabs.net/
+      notes: Hands-on BGP labs covering EBGP, IBGP, and policy on various platforms. [web:2]
+      framework_functions:
+        - Presentation
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Clabernetes
+      url: https://containerlab.dev/manual/clabernetes/
+      notes: Companion to Containerlab for deploying lab topologies into Kubernetes clusters. [web:2]
+      framework_functions:
+        - Orchestration
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Containerlab
+      url: https://containerlab.dev/
+      notes: CLI for orchestrating container-based network labs and virtual topologies. [web:2]
+      framework_functions:
+        - Orchestration
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: EVE-NG Community Edition
+      url: https://www.eve-ng.net/index.php/download/#DL-COMM
+      notes: Clientless multi-vendor network emulation platform for labs and training. [web:2]
+      framework_functions:
+        - Presentation
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: GNS3
+      url: https://www.gns3.com/
+      notes: Graphical virtual network lab environment supporting many vendors and scales. [web:2]
+      framework_functions:
+        - Presentation
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Mininet
+      url: https://mininet.org/
+      notes: Virtual SDN testbed running real kernel, switch, and application code on a single host. [web:2]
+      framework_functions:
+        - Executor
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Netlab
+      url: https://netlab.tools/
+      notes: YAML-driven lab orchestrator for defining and bringing up multi-vendor network labs. [web:2]
+      framework_functions:
+        - Orchestration
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: NRX
+      url: https://github.com/netreplica/nrx
+      notes: Exports NetBox topologies into formats such as Containerlab, CML, Graphite, and others. [web:2]
+      framework_functions:
+        - Orchestration
+        - Collector
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  Management – Automation:
+    - name: Ansible
+      url: https://www.ansible.com/
+      notes: General IT automation engine for configuration, deployment, and network automation. [web:2]
+      framework_functions:
+        - Executor
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Arista AVD
+      url: https://avd.arista.com/stable/index.html
+      notes: Arista Validated Designs automation framework generating structured EOS configs and extensible to other vendors. [web:2]
+      framework_functions:
+        - Intent
+        - Orchestration
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Awesome Network Automation list
+      url: https://github.com/networktocode/awesome-network-automation
+      notes: Curated catalog of network automation resources, tools, and learning material. [web:2]
+      framework_functions:
+        - Presentation
+        - Collector
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: AWX
+      url: https://github.com/ansible/awx
+      notes: Web UI, API, and task engine built on Ansible, upstream of Red Hat Ansible Automation Platform. [web:2]
+      framework_functions:
+        - Presentation
+        - Orchestration
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: eNMS
+      url: https://www.enms.io/
+      notes: Vendor-agnostic NMS designed around workflow-based network automation solutions. [web:2]
+      framework_functions:
+        - Orchestration
+        - Presentation
+        - Observability
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Jinja
+      url: https://jinja.palletsprojects.com/en/3.1.x/
+      notes: Templating engine widely used to render network device configurations from models. [web:2]
+      framework_functions:
+        - Intent
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Kubenet
+      url: https://learn.kubenet.dev/
+      notes: Community project exploring Kubernetes as an automation and orchestration engine for network devices. [web:2]
+      framework_functions:
+        - Orchestration
+        - Presentation
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Netmiko
+      url: https://github.com/ktbyers/netmiko
+      notes: Python library to automate CLI-based interaction with a broad set of network platforms. [web:2]
+      framework_functions:
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Net Schema
+      url: https://github.com/packetcoders/net-schema
+      notes: JSON Schema-based validator with network-specific validators for validating network data structures. [web:2]
+      framework_functions:
+        - Intent
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Network Unit Testing System (NUTS)
+      url: https://github.com/network-unit-testing-system/nuts
+      notes: Framework applying unit-test-style checks to live networks based on predefined test cases. [web:2]
+      framework_functions:
+        - Observability
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Nornir
+      url: https://github.com/nornir-automation/nornir
+      notes: Python-native automation framework offering inventory, tasks, and plugins for network automation. [web:2]
+      framework_functions:
+        - Orchestration
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Orchestrator-Core
+      url: https://workfloworchestrator.org/orchestrator-core/
+      notes: Framework for service orchestration and product lifecycle management for customer services. [web:2]
+      framework_functions:
+        - Orchestration
+        - Intent
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Pydantic
+      url: https://docs.pydantic.dev/latest/
+      notes: High-performance Python data validation and settings library used across automation codebases. [web:2]
+      framework_functions:
+        - Intent
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Scrapli
+      url: https://carlmontanari.github.io/scrapli/
+      notes: Python library for high-performance CLI interactions with network devices via SSH/Telnet. [web:2]
+      framework_functions:
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Terraform
+      url: https://www.terraform.io/use-cases/manage-network-infrastructure
+      notes: IaC tool for building and managing infrastructure; licensing changes led to the OpenTofu fork. [web:2]
+      framework_functions:
+        - Intent
+        - Orchestration
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  Management – Configuration:
+    - name: Aerleon
+      url: https://github.com/aerleon/aerleon
+      notes: Generator for multi-platform firewall configs from a platform-agnostic policy language. [web:2]
+      framework_functions:
+        - Intent
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Batfish
+      url: https://www.batfish.org/
+      notes: Network configuration analysis tool to detect errors and verify intent. [web:2]
+      framework_functions:
+        - Observability
+        - Intent
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Netshot
+      url: https://www.netfishers.onl/netshot
+      notes: Network device manager focused on configuration backup, compliance, and change tracking. [web:2]
+      framework_functions:
+        - Collector
+        - Observability
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Network Configuration Backup
+      url: https://github.com/jeremyschulman/netcfgbu
+      notes: Tool to back up monolithic NOS configurations into version control via SSH. [web:2]
+      framework_functions:
+        - Collector
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Open-AudIT
+      url: https://github.com/Opmantek/open-audit
+      notes: Network inventory and audit system that tracks what is on the network and how it changes. [web:2]
+      framework_functions:
+        - Collector
+        - Presentation
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Oxidized
+      url: https://github.com/ytti/oxidized
+      notes: Lightweight, extensible network configuration backup tool and RANCID replacement. [web:2]
+      framework_functions:
+        - Collector
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: rConfig Community Edition
+      url: https://github.com/rconfig
+      notes: Enterprise network configuration management platform for heterogeneous networks. [web:2]
+      framework_functions:
+        - Orchestration
+        - Presentation
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  Management – DCIM, IPAM, Network Source Of Truth:
+    - name: Infrahub
+      url: https://github.com/opsmill/infrahub
+      notes: Git-integrated source-of-truth platform with graph data model for infrastructure automation. [web:2]
+      framework_functions:
+        - Intent
+        - Presentation
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Nautobot
+      url: https://networktocode.com/nautobot/
+      notes: Automation-focused network source-of-truth derived as a fork of NetBox. [web:2]
+      framework_functions:
+        - Intent
+        - Presentation
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: NetBox
+      url: https://netboxlabs.com/open-source-netbox/
+      notes: Authoritative inventory and IPAM platform used as a network source of truth. [web:2]
+      framework_functions:
+        - Intent
+        - Presentation
+        - Observability
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: phpIPAM
+      url: https://phpipam.net/
+      notes: Web-based IP address management tool with a modern UI and MySQL backend. [web:2]
+      framework_functions:
+        - Intent
+        - Presentation
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  Management – Network Management Systems:
+    - name: LibreNMS
+      url: https://www.librenms.org/
+      notes: Fully featured open-source network monitoring and alerting system, forked from Observium. [web:2]
+      framework_functions:
+        - Observability
+        - Presentation
+        - Collector
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: NeDi
+      url: https://www.nedi.ch/
+      notes: Network discovery and management tool with topology awareness and traffic/statistics monitoring. [web:2]
+      framework_functions:
+        - Observability
+        - Collector
+        - Presentation
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  Monitoring – Flow Collectors & Generators:
+    - name: Elastiflow
+      url: https://github.com/elastiflow/elastiflow
+      notes: Flow collection and analytics stack built on Elasticsearch components. [web:2]
+      framework_functions:
+        - Collector
+        - Observability
+        - Presentation
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: nfdump
+      url: https://github.com/phaag/nfdump
+      notes: Suite for collecting, storing, and analyzing NetFlow and IPFIX records. [web:2]
+      framework_functions:
+        - Collector
+        - Observability
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  Monitoring – Log Management:
+    - name: Graylog
+      url: https://www.graylog.org/
+      notes: Centralized log management platform used for collecting and analyzing network and system logs. [web:2]
+      framework_functions:
+        - Collector
+        - Observability
+        - Presentation
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Loki
+      url: https://grafana.com/oss/loki/
+      notes: Prometheus-inspired log aggregation system optimized for labels and integration with Grafana. [web:2]
+      framework_functions:
+        - Collector
+        - Observability
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  Monitoring – Observability:
+    - name: SuzieQ
+      url: https://github.com/netenglabs/suzieq
+      notes: Open-source, multi-vendor network observability framework for collecting, storing, and querying network state. [web:2][web:36]
+      framework_functions:
+        - Observability
+        - Collector
+        - Presentation
+      source:
+        - Packet Pushers Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+        - Steinzi Network Automation Landscape (https://steinzi.com/network-automation-landscape/) [web:2]
+
+  Network Services:
+    - name: CoreDNS
+      url: https://coredns.io/
+      notes: DNS server written in Go, commonly used as the DNS component in cloud-native platforms. [web:2]
+      framework_functions:
+        - Executor
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Kea DHCP
+      url: https://kea.isc.org/
+      notes: Modern DHCP server from ISC with modular architecture and APIs. [web:2]
+      framework_functions:
+        - Executor
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  Operating Systems:
+    - name: SONiC
+      url: https://sonic-net.github.io/SONiC/
+      notes: Open-source network OS based on Linux, targeting whitebox switches. [web:2]
+      framework_functions:
+        - Executor
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: VyOS
+      url: https://vyos.io/
+      notes: Open-source network operating system for routers, firewalls, and VPN appliances. [web:2]
+      framework_functions:
+        - Executor
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  Routing & Overlay Platforms:
+    - name: FRRouting
+      url: https://frrouting.org/
+      notes: Full-featured IP routing stack supporting multiple routing protocols. [web:2]
+      framework_functions:
+        - Executor
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: OpenDaylight
+      url: https://www.opendaylight.org/
+      notes: SDN controller platform implementing southbound protocols and network applications. [web:2]
+      framework_functions:
+        - Orchestration
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  Security – DDoS Mitigation:
+    - name: FastNetMon
+      url: https://fastnetmon.com/
+      notes: DDoS detection and mitigation tool based on flow and packet statistics. [web:2]
+      framework_functions:
+        - Collector
+        - Observability
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  Security – Firewalls & Filtering:
+    - name: pfSense
+      url: https://www.pfsense.org/
+      notes: FreeBSD-based firewall and routing platform used in many SMB and lab environments. [web:2]
+      framework_functions:
+        - Executor
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: OPNsense
+      url: https://opnsense.org/
+      notes: Hardened BSD-based firewall and networking platform derived from pfSense. [web:2]
+      framework_functions:
+        - Executor
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  Security – Intrusion Detection/Prevention:
+    - name: Suricata
+      url: https://suricata.io/
+      notes: IDS/IPS and network security monitoring engine capable of deep packet inspection. [web:2]
+      framework_functions:
+        - Observability
+        - Executor
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  Security – Scanning:
+    - name: Nmap
+      url: https://nmap.org/
+      notes: Network discovery and security scanner for host and service identification. [web:2]
+      framework_functions:
+        - Collector
+        - Observability
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  Security – VPN:
+    - name: WireGuard
+      url: https://www.wireguard.com/
+      notes: Modern VPN protocol and implementation focused on simplicity and performance. [web:2]
+      framework_functions:
+        - Executor
+        - Orchestration
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  Tools – CLI Utilities:
+    - name: netmtr
+      url: https://github.com/traviscross/mtr
+      notes: Combines ping and traceroute for interactive network path analysis. [web:2]
+      framework_functions:
+        - Executor
+        - Observability
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  Tools – Packet Capture & Analysis:
+    - name: Wireshark
+      url: https://www.wireshark.org/
+      notes: Cross-platform packet analyzer for deep inspection of network traffic. [web:2]
+      framework_functions:
+        - Collector
+        - Observability
+        - Presentation
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+  Tools – Traffic Generators:
+    - name: Arachne
+      url: https://github.com/uber/arachne
+      notes: Packet loss detection and underperforming path identification system that generates probe traffic. [web:2]
+      framework_functions:
+        - Executor
+        - Observability
+        - Collector
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: D-ITG
+      url: http://traffic.comics.unina.it/software/ITG/
+      notes: Distributed Internet Traffic Generator capable of generating realistic traffic patterns at multiple layers. [web:2]
+      framework_functions:
+        - Executor
+        - Observability
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: MoonGen
+      url: https://github.com/emmericp/MoonGen
+      notes: Scriptable high-speed packet generator built on DPDK and LuaJIT for saturating high‑speed links. [web:2][web:42]
+      framework_functions:
+        - Executor
+        - Observability
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Ostinato
+      url: https://ostinato.org/
+      notes: GUI-driven and scriptable packet crafter and traffic generator for testing and troubleshooting networks. [web:2]
+      framework_functions:
+        - Executor
+        - Observability
+        - Presentation
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: TRex
+      url: https://trex-tgn.cisco.com/
+      notes: Stateful and stateless traffic generator that can drive realistic traffic profiles at high rates. [web:2]
+      framework_functions:
+        - Executor
+        - Observability
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]
+
+    - name: Iperf3
+      url: https://software.es.net/iperf/
+      notes: Network testing tool for measuring TCP and UDP throughput between endpoints. [web:2]
+      framework_functions:
+        - Executor
+        - Observability
+      source:
+        - Packet Pushers: Open Source Networking Projects: A Current List (https://packetpushers.net/blog/open-source-networking-projects/) [web:2]

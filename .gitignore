@@ -8,3 +8,13 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Environment / secrets
+.env
+.python-version
+
+# MCP config (contains API tokens — do not commit with real values)
+.mcp.json
+
+# macOS
+.DS_Store
