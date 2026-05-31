@@ -29,7 +29,7 @@ This is a **spec-driven** project. `automation_tools_schema_spec.md` is the auth
 
 Primary target: PostgreSQL. SQLite supported for local dev; DuckDB for analytics. Key portability differences (UUID generation, array types, enum types, GIN indexes) are documented in spec §8.6.
 
-Eleven tables with strict normalization (3NF, join tables — no JSONB blobs except where explicitly marked):
+Twelve tables with strict normalization (3NF, join tables — no JSONB blobs except where explicitly marked):
 
 | Table | Role |
 |-------|------|
@@ -45,6 +45,7 @@ Eleven tables with strict normalization (3NF, join tables — no JSONB blobs exc
 | `tool_naf_function_map` | Many-to-many: tools ↔ NAF framework functions (presentation/intent/observability/collector/orchestration/executor) |
 | `data_sources` | Catalog of discovery sources (Packet Pushers, Steinzi, manual) |
 | `tool_source_map` | Many-to-many: tools ↔ data sources (provenance — required, cannot be empty) |
+| `api_keys` | Hashed admin API keys for authenticating write operations; raw key stored once, never again |
 
 All controlled vocabularies are database-level enum types: `tool_type`, `tool_status`, `integration_type`, `dependency_type`, `protocol_support`, `platform_type`, `install_method`, `naf_function`.
 
@@ -65,6 +66,7 @@ Primary resource is `/api/v1/tools` with sub-resources for versions, capabilitie
 - **`version_string` is immutable**: Correct a bad version by delete + re-insert.
 - **Source provenance required**: Every tool must have at least one `tool_source_map` entry. The `POST /api/v1/tools` endpoint must reject submissions with an empty `sources` array (app-layer validation).
 - **Source deletion restricted**: Cannot delete a `data_sources` row while tools reference it (`ON DELETE RESTRICT`).
+- **All writes require auth**: Every non-GET endpoint requires `Authorization: Bearer <key>`. Keys are hashed (SHA-256) in `api_keys`; raw key returned once at creation. Bootstrap via `uv run python main.py create-admin-key`. See spec §5.6.
 
 ### Design Principles
 

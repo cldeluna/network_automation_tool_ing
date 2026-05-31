@@ -53,7 +53,7 @@ The system serves as the authoritative source of record for tooling decisions in
 | NG1 | This is not a package manager or installer — it records install commands but does not execute them |
 | NG2 | This is not a vulnerability or CVE database, though `status` captures deprecation signals |
 | NG3 | This is not a live telemetry system — version freshness relies on manual or automated seed updates |
-| NG4 | Authentication and multi-tenancy are out of scope for v1 |
+| NG4 | Multi-tenancy and per-user access control are out of scope for v1. A single admin credential tier is supported (see §5.6). |
 
 ### 1.4 Design Principles
 
@@ -751,6 +751,43 @@ CREATE INDEX idx_tool_source_map_source ON tool_source_map (source_id);
 
 ---
 
+### 3.14 `api_keys`
+
+Stores hashed admin API keys for authenticating write operations. The raw key is never persisted — only its SHA-256 hash.
+
+```sql
+CREATE TABLE api_keys (
+    id           UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
+    name         VARCHAR(255)    NOT NULL,
+    key_prefix   VARCHAR(16)     NOT NULL,
+    key_hash     VARCHAR(255)    NOT NULL UNIQUE,
+    is_active    BOOLEAN         NOT NULL DEFAULT TRUE,
+    created_at   TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    last_used_at TIMESTAMPTZ,
+    expires_at   TIMESTAMPTZ
+);
+
+CREATE INDEX idx_api_keys_hash   ON api_keys (key_hash);
+CREATE INDEX idx_api_keys_active ON api_keys (is_active) WHERE is_active = TRUE;
+```
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | `UUID` | PK | Surrogate key |
+| `name` | `VARCHAR(255)` | NOT NULL | Human label (e.g., `"CI pipeline"`, `"local dev"`) |
+| `key_prefix` | `VARCHAR(16)` | NOT NULL | First ~8 chars of the raw key — shown in listings for identification |
+| `key_hash` | `VARCHAR(255)` | NOT NULL UNIQUE | `SHA-256(raw_key)` hex-encoded — the value compared during auth |
+| `is_active` | `BOOLEAN` | NOT NULL, default `TRUE` | Revocation flag; set to `FALSE` to revoke without deleting |
+| `created_at` | `TIMESTAMPTZ` | NOT NULL | |
+| `last_used_at` | `TIMESTAMPTZ` | nullable | Updated asynchronously on each authenticated request |
+| `expires_at` | `TIMESTAMPTZ` | nullable | `NULL` = non-expiring key |
+
+> The raw key is returned exactly once at creation (`POST /api/v1/admin/keys`). It is never stored and cannot be retrieved again. Treat it like a password.
+
+> Keys use the prefix `nart_` (Network Automation Registry Tool) so they are recognizable in logs and environment variables (e.g., `NART_ADMIN_KEY=nart_abc1...`).
+
+---
+
 ## 4. Enum & Constant Definitions
 
 ### 4.1 `tool_type`
@@ -886,53 +923,82 @@ All responses follow the envelope:
 
 ### 5.2 Endpoints
 
+> **Auth column key:** `—` = public (no token required); `admin` = requires `Authorization: Bearer <key>` (see §5.6).
+
 #### Tools
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/v1/tools` | List all tools (paginated, filterable) |
-| `GET` | `/api/v1/tools/{slug}` | Get tool detail by slug |
-| `GET` | `/api/v1/tools/{slug}/versions` | List versions for a tool |
-| `GET` | `/api/v1/tools/{slug}/capabilities` | List capabilities for a tool |
-| `GET` | `/api/v1/tools/{slug}/integrations` | List integrations (in + out) for a tool |
-| `GET` | `/api/v1/tools/{slug}/dependencies` | List dependencies for a tool |
-| `GET` | `/api/v1/tools/{slug}/environments` | List environment support records |
-| `POST` | `/api/v1/tools` | Create a tool record |
-| `PATCH` | `/api/v1/tools/{slug}` | Update a tool record |
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/tools` | — | List all tools (paginated, filterable) |
+| `GET` | `/api/v1/tools/{slug}` | — | Get tool detail by slug |
+| `GET` | `/api/v1/tools/{slug}/versions` | — | List versions for a tool |
+| `GET` | `/api/v1/tools/{slug}/capabilities` | — | List capabilities for a tool |
+| `GET` | `/api/v1/tools/{slug}/integrations` | — | List integrations (in + out) for a tool |
+| `GET` | `/api/v1/tools/{slug}/dependencies` | — | List dependencies for a tool |
+| `GET` | `/api/v1/tools/{slug}/environments` | — | List environment support records |
+| `POST` | `/api/v1/tools` | **admin** | Create a tool record |
+| `PATCH` | `/api/v1/tools/{slug}` | **admin** | Update a tool record |
+| `DELETE` | `/api/v1/tools/{slug}` | **admin** | Delete a tool (cascades to all sub-resources) |
+| `POST` | `/api/v1/tools/{slug}/versions` | **admin** | Add a version to a tool |
+| `DELETE` | `/api/v1/tools/{slug}/versions/{version_string}` | **admin** | Remove a specific version |
+| `POST` | `/api/v1/tools/{slug}/capabilities` | **admin** | Add a capability to a tool |
+| `DELETE` | `/api/v1/tools/{slug}/capabilities/{id}` | **admin** | Remove a capability |
+| `POST` | `/api/v1/tools/{slug}/integrations` | **admin** | Declare an integration edge |
+| `DELETE` | `/api/v1/tools/{slug}/integrations/{id}` | **admin** | Remove an integration edge |
+| `POST` | `/api/v1/tools/{slug}/dependencies` | **admin** | Declare a dependency edge |
+| `DELETE` | `/api/v1/tools/{slug}/dependencies/{id}` | **admin** | Remove a dependency edge |
+| `POST` | `/api/v1/tools/{slug}/environments` | **admin** | Add environment support |
+| `DELETE` | `/api/v1/tools/{slug}/environments/{env_slug}` | **admin** | Remove environment support |
 
 #### Categories
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/v1/categories` | List all categories |
-| `GET` | `/api/v1/categories/{slug}/tools` | List tools in a category |
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/categories` | — | List all categories |
+| `GET` | `/api/v1/categories/{slug}/tools` | — | List tools in a category |
+| `POST` | `/api/v1/categories` | **admin** | Create a category |
+| `DELETE` | `/api/v1/categories/{slug}` | **admin** | Delete a category (cascades to `tool_category_map`) |
 
 #### Environments
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/v1/environments` | List environments |
-| `GET` | `/api/v1/environments/{slug}/tools` | List tools supported in this environment |
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/environments` | — | List environments |
+| `GET` | `/api/v1/environments/{slug}/tools` | — | List tools supported in this environment |
+| `POST` | `/api/v1/environments` | **admin** | Create an environment |
+| `DELETE` | `/api/v1/environments/{slug}` | **admin** | Delete an environment (cascades to `tool_environment_support`) |
 
 #### Capabilities Search
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/v1/capabilities` | Search capabilities across all tools |
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/capabilities` | — | Search capabilities across all tools |
 
 #### NAF Framework Functions
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/v1/naf-functions` | List all 6 NAF framework functions with descriptions |
-| `GET` | `/api/v1/naf-functions/{function}/tools` | List tools tagged with a given NAF function |
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/naf-functions` | — | List all 6 NAF framework functions with descriptions |
+| `GET` | `/api/v1/naf-functions/{function}/tools` | — | List tools tagged with a given NAF function |
 
 #### Data Sources
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/v1/sources` | List all registered data sources |
-| `GET` | `/api/v1/sources/{slug}/tools` | List tools discovered from a given source |
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/sources` | — | List all registered data sources |
+| `GET` | `/api/v1/sources/{slug}/tools` | — | List tools discovered from a given source |
+| `POST` | `/api/v1/sources` | **admin** | Register a new data source |
+| `DELETE` | `/api/v1/sources/{slug}` | **admin** | Delete a source (fails with `409` if tools reference it) |
+
+#### Admin — API Key Management
+
+All endpoints in this group require `Authorization: Bearer <key>`.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/admin/keys` | **admin** | List all API keys (prefix + metadata; raw key never returned) |
+| `POST` | `/api/v1/admin/keys` | **admin** | Create a new API key — raw key returned once in response |
+| `DELETE` | `/api/v1/admin/keys/{id}` | **admin** | Revoke a key (sets `is_active = FALSE`; does not delete the row) |
 
 ---
 
@@ -1062,6 +1128,84 @@ WHERE t.slug = 'suzieq';
   "errors": []
 }
 ```
+
+---
+
+## 5.6 Authentication
+
+### 5.6.1 Mechanism
+
+All write endpoints (any non-`GET` method) require a valid admin API key passed as a Bearer token:
+
+```
+Authorization: Bearer <raw_api_key>
+```
+
+The application layer authenticates each write request as follows:
+
+1. Extract the raw key from the `Authorization: Bearer` header.
+2. Compute `SHA-256(raw_key)` → lowercase hex string.
+3. Query `api_keys` where `key_hash = <computed_hash> AND is_active = TRUE AND (expires_at IS NULL OR expires_at > NOW())`.
+4. **Match found:** proceed with the request; update `last_used_at` asynchronously (non-blocking).
+5. **No match:** return `401 Unauthorized` immediately.
+
+Read (`GET`) endpoints are public and require no token.
+
+### 5.6.2 Error Responses
+
+Auth failures use the standard envelope with `data: null`:
+
+```json
+{
+  "data": null,
+  "meta": {},
+  "errors": [{ "code": "auth_invalid", "message": "API key is invalid or has been revoked." }]
+}
+```
+
+| Scenario | HTTP Status | Error Code | Message |
+|----------|-------------|------------|---------|
+| `Authorization` header missing on a write endpoint | `401` | `auth_required` | "This endpoint requires an admin API key." |
+| Key not found, revoked (`is_active = FALSE`), or hash mismatch | `401` | `auth_invalid` | "API key is invalid or has been revoked." |
+| Key found but `expires_at` is in the past | `401` | `auth_expired` | "API key has expired." |
+
+### 5.6.3 Key Creation: `POST /api/v1/admin/keys`
+
+Request body:
+```json
+{ "name": "CI pipeline", "expires_at": "2027-01-01T00:00:00Z" }
+```
+(`expires_at` is optional — omit for a non-expiring key.)
+
+Response (raw key returned **once**; store it immediately):
+```json
+{
+  "data": {
+    "id": "a1b2c3d4-...",
+    "name": "CI pipeline",
+    "key_prefix": "nart_abc1",
+    "raw_key": "nart_abc1def2ghij3klmn4opqr5stuv6wxyz",
+    "is_active": true,
+    "expires_at": "2027-01-01T00:00:00Z",
+    "created_at": "2026-05-31T00:00:00Z"
+  },
+  "meta": {},
+  "errors": []
+}
+```
+
+`GET /api/v1/admin/keys` list response omits `raw_key` entirely — only `id`, `name`, `key_prefix`, `is_active`, `created_at`, `last_used_at`, `expires_at` are returned.
+
+### 5.6.4 Bootstrap: Creating the First Key
+
+The first key must be created out-of-band before any authenticated API call can be made. The application provides a CLI management command:
+
+```bash
+uv run python main.py create-admin-key --name "initial"
+# Prints: key prefix, full raw key (shown once), confirms DB record created
+```
+
+Store the printed key in a secret manager or environment variable (e.g., `NART_ADMIN_KEY=nart_...`). The key cannot be recovered after this output is dismissed.
 
 ---
 
@@ -1410,12 +1554,15 @@ WHERE t.slug = 'nornir' AND ds.slug = 'steinzi';
 | `tool_naf_function_map` | `(tool_id, naf_function)` PRIMARY KEY | No duplicate NAF function assignments per tool |
 | `data_sources` | `slug` UNIQUE | No two sources share a slug |
 | `tool_source_map` | `(tool_id, source_id)` PRIMARY KEY | No duplicate source assignments per tool |
+| `api_keys` | `key_hash` UNIQUE | No two keys share the same hash |
 
 ### 7.2 Referential Integrity
 
 - All foreign keys use `ON DELETE CASCADE` for join tables and child records (e.g., `tool_versions`, `tool_capabilities`).
 - Self-referential foreign keys on `tool_integrations` and `tool_dependencies` use `ON DELETE CASCADE` — deleting a tool removes all its edges.
 - `tool_category_map` cascades on both sides — deleting a category removes all tool-category associations.
+- `DELETE /api/v1/tools/{slug}` cascades to all sub-resources: versions, capabilities, integrations, dependencies, environment support, NAF function map, and source map entries.
+- `DELETE /api/v1/sources/{slug}` is blocked at the DB level (`ON DELETE RESTRICT`) if any `tool_source_map` rows reference the source. The API layer translates this into `409 Conflict` with a message indicating how many tools must be reassigned first.
 
 ### 7.3 Self-Loop Prevention
 
@@ -1507,7 +1654,7 @@ tool_reviews (id, tool_id, author_handle, rating INT CHECK 1..5, body TEXT, crea
 tool_notes   (id, tool_id, author_handle, body TEXT, created_at)
 ```
 
-These would require an authentication layer (out of scope for v1).
+These would require a per-user identity layer beyond the single admin credential defined in §5.6 — out of scope for v1.
 
 ### 8.4 MCP Server Integration for AI-Driven Tool Discovery
 
