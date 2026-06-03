@@ -4,7 +4,7 @@
       "src": "api.py",
       "use": "@vercel/python",
       "config": {
-        "includeFiles": ["auth.py", "db.py"]
+        "includeFiles": ["auth.py", "db.py", "static/index.html"]
       }
     }
   ],

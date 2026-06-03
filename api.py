@@ -1,8 +1,10 @@
 import hashlib
+import os
 import secrets
 
 import psycopg2
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
+from fastapi.responses import HTMLResponse
 from psycopg2.extras import RealDictCursor
 from pydantic import BaseModel, Field
 
@@ -10,6 +12,14 @@ from auth import require_admin
 from db import get_conn
 
 app = FastAPI(title="Network Automation Registry", version="1.0.0")
+
+_STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+def index():
+    with open(os.path.join(_STATIC_DIR, "index.html")) as f:
+        return HTMLResponse(content=f.read())
 
 
 @app.get("/health")
