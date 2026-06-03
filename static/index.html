@@ -14,21 +14,55 @@
       align-items: center;
       justify-content: center;
       font-family: 'Segoe UI', Arial, sans-serif;
-      color: white;
       padding: 2rem;
     }
     h1 {
-      font-size: 1rem;
+      font-size: 0.9rem;
       font-weight: 600;
-      letter-spacing: 0.18em;
+      letter-spacing: 0.2em;
       text-transform: uppercase;
       margin-bottom: 2.5rem;
-      opacity: 0.55;
+      color: rgba(255,255,255,0.45);
     }
     svg.puzzle {
-      max-width: min(740px, 100%);
+      max-width: min(760px, 100%);
       height: auto;
-      filter: drop-shadow(0 8px 32px rgba(0,0,0,0.5));
+      filter: drop-shadow(0 8px 32px rgba(0,0,0,0.55));
+    }
+    /* styles for foreignObject content */
+    .tool-list {
+      overflow-y: auto;
+      height: 100%;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.25) transparent;
+    }
+    .tool-list::-webkit-scrollbar { width: 4px; }
+    .tool-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 2px; }
+    .tool-list ul { list-style: none; padding: 0; margin: 0; }
+    .tool-list li {
+      font-size: 10.5px;
+      line-height: 1.55;
+      color: rgba(255,255,255,0.88);
+      padding: 1px 5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      border-radius: 3px;
+      cursor: default;
+    }
+    .tool-list li:hover { background: rgba(255,255,255,0.15); }
+    .tool-loading {
+      font-size: 10px;
+      color: rgba(255,255,255,0.4);
+      padding: 3px 5px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-style: italic;
+    }
+    .tool-count {
+      font-size: 9px;
+      fill: rgba(255,255,255,0.45);
+      font-family: 'Segoe UI', Arial, sans-serif;
     }
   </style>
 </head>
@@ -37,120 +71,222 @@
   <h1>Network Automation Registry</h1>
 
   <!--
-    Puzzle grid: 3 cols × 2 rows, each cell 220×160.
-    Tab protrusion: 24px. Tab arc half-width: 40px.
+    Puzzle: 3 cols × 2 rows. Each base cell = 220 × 160.
+    Tab protrusion = 24px. Tab arc half-width = 40px.
+    viewBox adds 3px padding on all sides for stroke bleed.
 
-    Tab/notch convention per edge:
-      Row 0: right tabs → row 1 top notches (y boundary 160, tabs extend to y=184)
-      Col separations: left col right tabs → right col left notches (x tabs extend 24px)
+    Piece base rectangles:
+      Row 0: y=0..160     Col 0: x=0..220   Col 1: x=220..440   Col 2: x=440..660
+      Row 1: y=160..320
 
-    Piece centers (for labels/icons):
-      PRESENTATION  (110, 80)   OBSERVABILITY (330, 80)   ORCHESTRATION (550, 80)
-      INTENT        (110, 240)  COLLECTOR     (330, 240)  EXECUTOR      (550, 240)
+    Tabs/notches (T=tab out, N=notch in):
+      PRESENTATION  right=T  bottom=T
+      OBSERVABILITY left=N   right=T  bottom=T
+      ORCHESTRATION left=N   bottom=T
+      INTENT        top=N    right=T
+      COLLECTOR     top=N    left=N   right=T
+      EXECUTOR      top=N    left=N
+
+    Content safe zones (avoid tab/notch regions):
+      Col 0 foreignObject x=12,  width=195
+      Col 1 foreignObject x=252, width=178   (past left notch @x=220-244)
+      Col 2 foreignObject x=468, width=182   (past left notch @x=440-464)
+      Row 0 foreignObject y=34,  height=112
+      Row 1 foreignObject y=194, height=112
   -->
   <svg class="puzzle" viewBox="-3 -3 666 326" xmlns="http://www.w3.org/2000/svg">
 
-    <!-- ─────────────────── PRESENTATION – orange ─────────────────── -->
-    <path d="
-      M 0 0 L 220 0
-      L 220 40 Q 244 40 244 80 Q 244 120 220 120
-      L 220 160
-      L 150 160 Q 150 184 110 184 Q 70 184 70 160
-      L 0 160 Z"
-      fill="#E07830" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
-    <!-- monitor icon -->
-    <rect x="95" y="51" width="30" height="20" rx="2" fill="none" stroke="white" stroke-width="2"/>
-    <line x1="110" y1="71" x2="110" y2="78" stroke="white" stroke-width="2"/>
-    <line x1="103" y1="78" x2="117" y2="78" stroke="white" stroke-width="2"/>
-    <text x="110" y="107" text-anchor="middle"
-      font-family="'Segoe UI',Arial,sans-serif" font-weight="800" font-size="12"
-      fill="white" letter-spacing="1.5">PRESENTATION</text>
+    <!-- ═══════════════ PRESENTATION – orange ═══════════════ -->
+    <path d="M 0 0 L 220 0
+             L 220 40 Q 244 40 244 80 Q 244 120 220 120
+             L 220 160
+             L 150 160 Q 150 184 110 184 Q 70 184 70 160
+             L 0 160 Z"
+      fill="#E07830" stroke="rgba(255,255,255,0.1)" stroke-width="1.5"/>
+    <text x="110" y="20" text-anchor="middle"
+      font-family="'Segoe UI',Arial,sans-serif" font-weight="800" font-size="11.5"
+      fill="white" letter-spacing="1.8">PRESENTATION</text>
+    <line x1="18" y1="27" x2="202" y2="27" stroke="rgba(255,255,255,0.25)" stroke-width="0.8"/>
+    <text class="tool-count" x="110" y="155" text-anchor="middle" id="count-presentation"/>
+    <foreignObject x="12" y="32" width="195" height="112">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="tool-list" id="tools-presentation">
+        <div class="tool-loading">loading…</div>
+      </div>
+    </foreignObject>
 
-    <!-- ─────────────────── OBSERVABILITY – green ─────────────────── -->
-    <path d="
-      M 220 0 L 440 0
-      L 440 40 Q 464 40 464 80 Q 464 120 440 120
-      L 440 160
-      L 370 160 Q 370 184 330 184 Q 290 184 290 160
-      L 220 160
-      L 220 120 Q 244 120 244 80 Q 244 40 220 40 Z"
-      fill="#4EA64E" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
-    <!-- magnifying glass icon -->
-    <circle cx="327" cy="59" r="10" fill="none" stroke="white" stroke-width="2"/>
-    <line x1="334" y1="67" x2="344" y2="77" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
-    <text x="330" y="107" text-anchor="middle"
-      font-family="'Segoe UI',Arial,sans-serif" font-weight="800" font-size="12"
-      fill="white" letter-spacing="1.5">OBSERVABILITY</text>
+    <!-- ═══════════════ OBSERVABILITY – green ═══════════════ -->
+    <path d="M 220 0 L 440 0
+             L 440 40 Q 464 40 464 80 Q 464 120 440 120
+             L 440 160
+             L 370 160 Q 370 184 330 184 Q 290 184 290 160
+             L 220 160
+             L 220 120 Q 244 120 244 80 Q 244 40 220 40 Z"
+      fill="#4EA64E" stroke="rgba(255,255,255,0.1)" stroke-width="1.5"/>
+    <text x="330" y="20" text-anchor="middle"
+      font-family="'Segoe UI',Arial,sans-serif" font-weight="800" font-size="11.5"
+      fill="white" letter-spacing="1.8">OBSERVABILITY</text>
+    <line x1="238" y1="27" x2="422" y2="27" stroke="rgba(255,255,255,0.25)" stroke-width="0.8"/>
+    <text class="tool-count" x="330" y="155" text-anchor="middle" id="count-observability"/>
+    <foreignObject x="252" y="32" width="178" height="112">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="tool-list" id="tools-observability">
+        <div class="tool-loading">loading…</div>
+      </div>
+    </foreignObject>
 
-    <!-- ─────────────────── ORCHESTRATION – blue ─────────────────── -->
-    <path d="
-      M 440 0 L 660 0
-      L 660 160
-      L 590 160 Q 590 184 550 184 Q 510 184 510 160
-      L 440 160
-      L 440 120 Q 464 120 464 80 Q 464 40 440 40 Z"
-      fill="#4A85CA" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
-    <!-- branch / topology icon -->
-    <line x1="550" y1="49" x2="550" y2="59" stroke="white" stroke-width="2"/>
-    <line x1="550" y1="59" x2="541" y2="69" stroke="white" stroke-width="2"/>
-    <line x1="550" y1="59" x2="559" y2="69" stroke="white" stroke-width="2"/>
-    <circle cx="550" cy="46" r="4" fill="white"/>
-    <circle cx="539" cy="72" r="4" fill="white"/>
-    <circle cx="561" cy="72" r="4" fill="white"/>
-    <text x="550" y="107" text-anchor="middle"
-      font-family="'Segoe UI',Arial,sans-serif" font-weight="800" font-size="12"
-      fill="white" letter-spacing="1.5">ORCHESTRATION</text>
+    <!-- ═══════════════ ORCHESTRATION – blue ═══════════════ -->
+    <path d="M 440 0 L 660 0
+             L 660 160
+             L 590 160 Q 590 184 550 184 Q 510 184 510 160
+             L 440 160
+             L 440 120 Q 464 120 464 80 Q 464 40 440 40 Z"
+      fill="#4A85CA" stroke="rgba(255,255,255,0.1)" stroke-width="1.5"/>
+    <text x="550" y="20" text-anchor="middle"
+      font-family="'Segoe UI',Arial,sans-serif" font-weight="800" font-size="11.5"
+      fill="white" letter-spacing="1.8">ORCHESTRATION</text>
+    <line x1="458" y1="27" x2="642" y2="27" stroke="rgba(255,255,255,0.25)" stroke-width="0.8"/>
+    <text class="tool-count" x="550" y="155" text-anchor="middle" id="count-orchestration"/>
+    <foreignObject x="468" y="32" width="182" height="112">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="tool-list" id="tools-orchestration">
+        <div class="tool-loading">loading…</div>
+      </div>
+    </foreignObject>
 
-    <!-- ─────────────────── INTENT – golden ─────────────────── -->
-    <path d="
-      M 0 160
-      L 70 160 Q 70 184 110 184 Q 150 184 150 160
-      L 220 160
-      L 220 200 Q 244 200 244 240 Q 244 280 220 280
-      L 220 320 L 0 320 Z"
-      fill="#CC8820" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
-    <!-- diamond icon -->
-    <polygon points="110,217 122,232 110,247 98,232"
-      fill="none" stroke="white" stroke-width="2" stroke-linejoin="round"/>
-    <text x="110" y="274" text-anchor="middle"
-      font-family="'Segoe UI',Arial,sans-serif" font-weight="800" font-size="12"
-      fill="white" letter-spacing="1.5">INTENT</text>
+    <!-- ═══════════════ INTENT – golden ═══════════════ -->
+    <path d="M 0 160
+             L 70 160 Q 70 184 110 184 Q 150 184 150 160
+             L 220 160
+             L 220 200 Q 244 200 244 240 Q 244 280 220 280
+             L 220 320 L 0 320 Z"
+      fill="#CC8820" stroke="rgba(255,255,255,0.1)" stroke-width="1.5"/>
+    <text x="110" y="180" text-anchor="middle"
+      font-family="'Segoe UI',Arial,sans-serif" font-weight="800" font-size="11.5"
+      fill="white" letter-spacing="1.8">INTENT</text>
+    <line x1="18" y1="187" x2="202" y2="187" stroke="rgba(255,255,255,0.25)" stroke-width="0.8"/>
+    <text class="tool-count" x="110" y="315" text-anchor="middle" id="count-intent"/>
+    <foreignObject x="12" y="192" width="195" height="112">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="tool-list" id="tools-intent">
+        <div class="tool-loading">loading…</div>
+      </div>
+    </foreignObject>
 
-    <!-- ─────────────────── COLLECTOR – dark red ─────────────────── -->
-    <path d="
-      M 220 160
-      L 290 160 Q 290 184 330 184 Q 370 184 370 160
-      L 440 160
-      L 440 200 Q 464 200 464 240 Q 464 280 440 280
-      L 440 320 L 220 320
-      L 220 280 Q 244 280 244 240 Q 244 200 220 200 Z"
-      fill="#882035" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
-    <!-- pine tree icon -->
-    <polygon points="330,214 341,233 319,233" fill="white"/>
-    <polygon points="330,224 344,246 316,246" fill="white"/>
-    <rect x="327" y="246" width="6" height="8" fill="white"/>
-    <text x="330" y="274" text-anchor="middle"
-      font-family="'Segoe UI',Arial,sans-serif" font-weight="800" font-size="12"
-      fill="white" letter-spacing="1.5">COLLECTOR</text>
+    <!-- ═══════════════ COLLECTOR – dark red ═══════════════ -->
+    <path d="M 220 160
+             L 290 160 Q 290 184 330 184 Q 370 184 370 160
+             L 440 160
+             L 440 200 Q 464 200 464 240 Q 464 280 440 280
+             L 440 320 L 220 320
+             L 220 280 Q 244 280 244 240 Q 244 200 220 200 Z"
+      fill="#882035" stroke="rgba(255,255,255,0.1)" stroke-width="1.5"/>
+    <text x="330" y="180" text-anchor="middle"
+      font-family="'Segoe UI',Arial,sans-serif" font-weight="800" font-size="11.5"
+      fill="white" letter-spacing="1.8">COLLECTOR</text>
+    <line x1="238" y1="187" x2="422" y2="187" stroke="rgba(255,255,255,0.25)" stroke-width="0.8"/>
+    <text class="tool-count" x="330" y="315" text-anchor="middle" id="count-collector"/>
+    <foreignObject x="252" y="192" width="178" height="112">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="tool-list" id="tools-collector">
+        <div class="tool-loading">loading…</div>
+      </div>
+    </foreignObject>
 
-    <!-- ─────────────────── EXECUTOR – purple ─────────────────── -->
-    <path d="
-      M 440 160
-      L 510 160 Q 510 184 550 184 Q 590 184 590 160
-      L 660 160
-      L 660 320 L 440 320
-      L 440 280 Q 464 280 464 240 Q 464 200 440 200 Z"
-      fill="#7755AA" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
-    <!-- double chevron down -->
-    <polyline points="543,222 550,233 557,222"
-      fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <polyline points="543,235 550,246 557,235"
-      fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <text x="550" y="274" text-anchor="middle"
-      font-family="'Segoe UI',Arial,sans-serif" font-weight="800" font-size="12"
-      fill="white" letter-spacing="1.5">EXECUTOR</text>
+    <!-- ═══════════════ EXECUTOR – purple ═══════════════ -->
+    <path d="M 440 160
+             L 510 160 Q 510 184 550 184 Q 590 184 590 160
+             L 660 160
+             L 660 320 L 440 320
+             L 440 280 Q 464 280 464 240 Q 464 200 440 200 Z"
+      fill="#7755AA" stroke="rgba(255,255,255,0.1)" stroke-width="1.5"/>
+    <text x="550" y="180" text-anchor="middle"
+      font-family="'Segoe UI',Arial,sans-serif" font-weight="800" font-size="11.5"
+      fill="white" letter-spacing="1.8">EXECUTOR</text>
+    <line x1="458" y1="187" x2="642" y2="187" stroke="rgba(255,255,255,0.25)" stroke-width="0.8"/>
+    <text class="tool-count" x="550" y="315" text-anchor="middle" id="count-executor"/>
+    <foreignObject x="468" y="192" width="182" height="112">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="tool-list" id="tools-executor">
+        <div class="tool-loading">loading…</div>
+      </div>
+    </foreignObject>
 
   </svg>
+
+  <script>
+    const NAF_FUNCTIONS = [
+      "presentation",
+      "observability",
+      "orchestration",
+      "intent",
+      "collector",
+      "executor",
+    ];
+
+    async function fetchAllTools() {
+      const res = await fetch("/api/v1/tools?per_page=100&page=1");
+      if (!res.ok) throw new Error(`API error ${res.status}`);
+      const json = await res.json();
+      let tools = json.data;
+
+      // fetch remaining pages if any
+      for (let p = 2; p <= json.meta.pages; p++) {
+        const r = await fetch(`/api/v1/tools?per_page=100&page=${p}`);
+        const j = await r.json();
+        tools = tools.concat(j.data);
+      }
+      return tools;
+    }
+
+    function groupByFunction(tools) {
+      const groups = {};
+      for (const fn of NAF_FUNCTIONS) groups[fn] = [];
+
+      for (const tool of tools) {
+        for (const fn of (tool.naf_functions || [])) {
+          if (fn in groups) groups[fn].push(tool.name);
+        }
+      }
+
+      // sort alphabetically within each group
+      for (const fn of NAF_FUNCTIONS) groups[fn].sort();
+      return groups;
+    }
+
+    function renderGroup(fn, names) {
+      const container = document.getElementById(`tools-${fn}`);
+      const counter   = document.getElementById(`count-${fn}`);
+      if (!container) return;
+
+      if (names.length === 0) {
+        container.innerHTML = '<div class="tool-loading">—</div>';
+        return;
+      }
+
+      const ul = document.createElement("ul");
+      for (const name of names) {
+        const li = document.createElement("li");
+        li.textContent = name;
+        li.title = name;
+        ul.appendChild(li);
+      }
+      container.innerHTML = "";
+      container.appendChild(ul);
+
+      if (counter) counter.textContent = `${names.length} tool${names.length !== 1 ? "s" : ""}`;
+    }
+
+    async function init() {
+      try {
+        const tools  = await fetchAllTools();
+        const groups = groupByFunction(tools);
+        for (const fn of NAF_FUNCTIONS) renderGroup(fn, groups[fn]);
+      } catch (err) {
+        console.error("Failed to load tools:", err);
+        for (const fn of NAF_FUNCTIONS) {
+          const el = document.getElementById(`tools-${fn}`);
+          if (el) el.innerHTML = '<div class="tool-loading">error</div>';
+        }
+      }
+    }
+
+    init();
+  </script>
 
 </body>
 </html>
