@@ -33,21 +33,22 @@ Twelve tables with strict normalization (3NF, join tables — no JSONB blobs exc
 
 | Table | Role |
 |-------|------|
-| `tools` | Core registry — name, slug, type, status, URLs |
+| `tools` | Core registry — name, slug, type, status, URLs, `naf_functions naf_function[]` array, and `business_model` enum |
 | `tool_categories` | Taxonomy labels (e.g., `configuration-management`) |
 | `tool_category_map` | Many-to-many: tools ↔ categories |
-| `tool_versions` | Point-in-time releases; only one `is_latest=TRUE` per tool (partial unique index + app-layer transaction) |
 | `tool_capabilities` | Named capabilities with `protocol_support[]` (enum array) and `os_support[]` (text array) |
-| `tool_integrations` | Directed integration edges between tools (self-referential, no self-loops) |
 | `tool_dependencies` | Directed dependency edges (self-referential, no self-loops) |
 | `environments` | Named compute environments (OS + platform) |
 | `tool_environment_support` | Install method + command per tool/environment pair |
-| `tool_naf_function_map` | Many-to-many: tools ↔ NAF framework functions (presentation/intent/observability/collector/orchestration/executor) |
+| `contacts` | People who have deployed or used a tool — name, org, role, contact URL, public flag |
+| `tool_contact_map` | Many-to-many: tools ↔ contacts, with a `use_case` field (community references) |
 | `data_sources` | Catalog of discovery sources (Packet Pushers, Steinzi, manual) |
 | `tool_source_map` | Many-to-many: tools ↔ data sources (provenance — required, cannot be empty) |
 | `api_keys` | Hashed admin API keys for authenticating write operations; raw key stored once, never again |
 
-All controlled vocabularies are database-level enum types: `tool_type`, `tool_status`, `integration_type`, `dependency_type`, `protocol_support`, `platform_type`, `install_method`, `naf_function`.
+> NAF framework functions (`presentation`, `intent`, `observability`, `collector`, `orchestration`, `executor`, `infrastructure`) are stored as a `naf_functions naf_function[]` GIN-indexed array column on `tools` — no separate join table. `infrastructure` covers lab/emulation tools (containerlab, GNS3, EVE-NG).
+
+All controlled vocabularies are database-level enum types: `tool_type`, `tool_status`, `integration_type`, `dependency_type`, `protocol_support`, `platform_type`, `install_method`, `naf_function`, `business_model`.
 
 All mutable tables have `created_at` / `updated_at` with auto-update triggers.
 
@@ -60,8 +61,7 @@ Primary resource is `/api/v1/tools` with sub-resources for versions, capabilitie
 ### Key Business Rules (from spec §7)
 
 - **Slug immutability**: Once published, slugs on `tools`, `tool_categories`, `environments`, and `data_sources` must not change. They are stable external identifiers.
-- **Single latest version**: At most one `tool_versions` row per tool may have `is_latest = TRUE`. Enforce via partial unique index + single transaction (first clear existing, then set new).
-- **No self-loops**: `tool_integrations` and `tool_dependencies` both CHECK `tool_id <> target_id`.
+- **No self-loops**: `tool_dependencies` CHECK `tool_id <> depends_on_tool_id`.
 - **Status transitions**: `archived` is terminal. Permitted transitions: `active → deprecated|archived|experimental`, `experimental → active|archived`, `deprecated → archived`.
 - **`version_string` is immutable**: Correct a bad version by delete + re-insert.
 - **Source provenance required**: Every tool must have at least one `tool_source_map` entry. The `POST /api/v1/tools` endpoint must reject submissions with an empty `sources` array (app-layer validation).

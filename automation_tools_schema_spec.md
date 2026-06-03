@@ -74,27 +74,27 @@ The system serves as the authoritative source of record for tooling decisions in
 |--------|-------------|
 | `Tool` | A discrete automation tool, library, platform, or agent |
 | `ToolCategory` | A taxonomy label (e.g., "Configuration Management", "Network Simulation") |
-| `ToolVersion` | A point-in-time release of a Tool |
 | `ToolCapability` | A named capability of a tool (e.g., NETCONF support, templating) |
-| `ToolIntegration` | A declared integration relationship between two Tools |
 | `ToolDependency` | A runtime, dev, or optional dependency between two Tools |
 | `Environment` | A named compute environment (OS + platform combination) |
 | `ToolEnvironmentSupport` | Install method and command for a Tool in a given Environment |
 | `ToolCategoryMap` | Many-to-many join between Tool and ToolCategory |
-| `NafFunctionMap` | One of 6 NAF framework functional roles assigned to a tool |
 | `DataSource` | A catalog of sources from which tools are discovered or submitted |
 | `ToolSourceMap` | Many-to-many join between Tool and DataSource (provenance) |
+| `Contact` | A person who has deployed or used a tool and can serve as a community reference |
+| `ToolContactMap` | Many-to-many join between Tool and Contact, with a use-case description |
+
+> **NAF function roles** are stored as a `naf_functions naf_function[]` array column directly on `Tool` — no separate join table. This follows the same pattern as `protocol_support[]` and `os_support[]`.
 
 ### 2.2 Relationships
 
 - A **Tool** belongs to one or more **ToolCategories** (via `ToolCategoryMap`).
-- A **Tool** has zero or more **ToolVersions**.
 - A **Tool** has zero or more **ToolCapabilities**.
-- A **Tool** integrates with zero or more other **Tools** (via `ToolIntegration`, self-referential on `tools`).
 - A **Tool** depends on zero or more other **Tools** (via `ToolDependency`, self-referential on `tools`).
 - A **Tool** is supported in zero or more **Environments** (via `ToolEnvironmentSupport`).
-- A **Tool** is assigned zero or more **NafFunctions** (via `tool_naf_function_map`).
+- A **Tool** is assigned zero or more **NAF functions** via the `naf_functions naf_function[]` array column on `tools` — no separate join table.
 - A **Tool** is referenced by one or more **DataSources** (via `tool_source_map`). Provenance is required: every tool in the registry must trace back to at least one source.
+- A **Tool** may have zero or more **Contacts** listed as community references (via `tool_contact_map`). A Contact may be linked to multiple tools.
 
 ### 2.3 ER Diagram
 
@@ -110,6 +110,7 @@ erDiagram
         string repo_url
         string license
         tool_status status
+        naf_function[] naf_functions
         timestamp created_at
         timestamp updated_at
     }
@@ -126,17 +127,6 @@ erDiagram
         uuid category_id FK
     }
 
-    tool_versions {
-        uuid id PK
-        uuid tool_id FK
-        string version_string
-        date release_date
-        boolean is_latest
-        string changelog_url
-        timestamp created_at
-        timestamp updated_at
-    }
-
     tool_capabilities {
         uuid id PK
         uuid tool_id FK
@@ -144,15 +134,6 @@ erDiagram
         protocol_support[] protocol_support
         string[] os_support
         text notes
-    }
-
-    tool_integrations {
-        uuid id PK
-        uuid tool_id FK
-        uuid integrates_with_tool_id FK
-        integration_type integration_type
-        text notes
-        timestamp created_at
     }
 
     tool_dependencies {
@@ -183,9 +164,23 @@ erDiagram
         timestamp updated_at
     }
 
-    tool_naf_function_map {
+    contacts {
+        uuid id PK
+        string name
+        string org
+        string role
+        string contact_url
+        boolean is_public
+        text notes
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    tool_contact_map {
         uuid tool_id FK
-        naf_function naf_function
+        uuid contact_id FK
+        text use_case
+        timestamp created_at
     }
 
     data_sources {
@@ -206,15 +201,13 @@ erDiagram
 
     tools ||--o{ tool_category_map : "categorized via"
     tool_categories ||--o{ tool_category_map : "applied to"
-    tools ||--o{ tool_versions : "has"
     tools ||--o{ tool_capabilities : "has"
-    tools ||--o{ tool_integrations : "source of"
-    tools ||--o{ tool_integrations : "target of"
     tools ||--o{ tool_dependencies : "depends via"
     tools ||--o{ tool_dependencies : "depended on via"
     tools ||--o{ tool_environment_support : "supported in"
     environments ||--o{ tool_environment_support : "hosts"
-    tools ||--o{ tool_naf_function_map : "classified via"
+    tools ||--o{ tool_contact_map : "referenced by"
+    contacts ||--o{ tool_contact_map : "references"
     tools ||--o{ tool_source_map : "sourced via"
     data_sources ||--o{ tool_source_map : "references"
 ```
@@ -223,7 +216,7 @@ erDiagram
 
 ## 3. Schema Specification
 
-> All schemas are written in PostgreSQL DDL. SQLite compatibility notes are included inline where behavior diverges. UUIDs use `gen_random_uuid()` (PostgreSQL 13+); substitute `randomblob(16)` for SQLite or use a UUID library.
+> All schemas are written in PostgreSQL DDL (Data Definition Language — the SQL statements that create types, tables, indexes, and triggers: `CREATE TYPE`, `CREATE TABLE`, `CREATE INDEX`, `CREATE TRIGGER`). SQLite compatibility notes are included inline where behavior diverges. UUIDs use `gen_random_uuid()` (PostgreSQL 13+); substitute `randomblob(16)` for SQLite or use a UUID library.
 
 ### 3.1 Enum Types
 
@@ -247,16 +240,6 @@ CREATE TYPE tool_status AS ENUM (
     'deprecated',
     'experimental',
     'archived'
-);
-
--- Integration relationship type
-CREATE TYPE integration_type AS ENUM (
-    'native',       -- First-party, documented integration
-    'plugin',       -- Via a plugin/extension mechanism
-    'api',          -- Integration over a REST/gRPC API
-    'mcp',          -- Model Context Protocol server bridge
-    'wrapper',      -- One tool wraps or embeds the other
-    'informal'      -- Community-maintained, undocumented coupling
 );
 
 -- Dependency classification
@@ -316,7 +299,19 @@ CREATE TYPE naf_function AS ENUM (
     'observability',  -- Actual state storage and analysis
     'collector',      -- Gathers current state from devices (SSH, gNMI, telemetry)
     'orchestration',  -- Coordinates workflows and event-driven automation
-    'executor'        -- Applies changes directly to network devices
+    'executor',       -- Applies changes directly to network devices
+    'infrastructure'  -- Lab/emulation environment tools (containerlab, GNS3, EVE-NG)
+);
+
+-- Business/licensing model (sourced from Steinzi project classification)
+CREATE TYPE business_model AS ENUM (
+    'full-open-source',   -- Fully open source, no commercial tier
+    'enterprise',         -- Commercial product, open-source components optional
+    'saas',               -- Software as a Service, no self-hosted option
+    'freemium',           -- Free tier available, paid upgrades
+    'hybrid',             -- Open-source core with commercial extensions or support
+    'closed-core',        -- Proprietary core with open-source periphery
+    'commercial-only'     -- Fully commercial, no open-source version
 );
 ```
 
@@ -337,6 +332,8 @@ CREATE TABLE tools (
     repo_url        VARCHAR(2048),
     license         VARCHAR(128),   -- SPDX identifier preferred, e.g. "Apache-2.0", "MIT"
     status          tool_status     NOT NULL DEFAULT 'active',
+    naf_functions   naf_function[]  NOT NULL DEFAULT '{}',
+    business_model  business_model  NULL,
     created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
 
@@ -345,9 +342,11 @@ CREATE TABLE tools (
     CONSTRAINT tools_slug_format CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$')
 );
 
-CREATE INDEX idx_tools_status   ON tools (status);
-CREATE INDEX idx_tools_type     ON tools (tool_type);
-CREATE INDEX idx_tools_name     ON tools USING gin (to_tsvector('english', name || ' ' || COALESCE(description, '')));
+CREATE INDEX idx_tools_status         ON tools (status);
+CREATE INDEX idx_tools_type           ON tools (tool_type);
+CREATE INDEX idx_tools_naf_functions  ON tools USING gin (naf_functions);
+CREATE INDEX idx_tools_business_model ON tools (business_model) WHERE business_model IS NOT NULL;
+CREATE INDEX idx_tools_name           ON tools USING gin (to_tsvector('english', name || ' ' || COALESCE(description, '')));
 
 -- Auto-update updated_at on row modification
 CREATE OR REPLACE FUNCTION set_updated_at()
@@ -374,6 +373,8 @@ CREATE TRIGGER trg_tools_updated_at
 | `repo_url` | `VARCHAR(2048)` | nullable | Source repository URL |
 | `license` | `VARCHAR(128)` | nullable | SPDX license identifier |
 | `status` | `tool_status` enum | NOT NULL, default `active` | Lifecycle state |
+| `naf_functions` | `naf_function[]` | NOT NULL, default `{}` | NAF framework functional roles (GIN-indexed for `= ANY()` filtering) |
+| `business_model` | `business_model` enum | nullable | Business/licensing model from Steinzi classification; `NULL` if unknown |
 | `created_at` | `TIMESTAMPTZ` | NOT NULL, default `NOW()` | Record creation time |
 | `updated_at` | `TIMESTAMPTZ` | NOT NULL, default `NOW()` | Last modification time (auto-updated) |
 
@@ -440,48 +441,7 @@ CREATE INDEX idx_tool_category_map_category ON tool_category_map (category_id);
 
 ---
 
-### 3.5 `tool_versions`
-
-Tracks discrete releases of a tool.
-
-```sql
-CREATE TABLE tool_versions (
-    id              UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
-    tool_id         UUID            NOT NULL REFERENCES tools(id) ON DELETE CASCADE,
-    version_string  VARCHAR(128)    NOT NULL,
-    release_date    DATE,
-    is_latest       BOOLEAN         NOT NULL DEFAULT FALSE,
-    changelog_url   VARCHAR(2048),
-    created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT tool_versions_unique UNIQUE (tool_id, version_string)
-);
-
-CREATE INDEX idx_tool_versions_tool_id  ON tool_versions (tool_id);
-CREATE INDEX idx_tool_versions_latest   ON tool_versions (tool_id, is_latest) WHERE is_latest = TRUE;
-
-CREATE TRIGGER trg_tool_versions_updated_at
-    BEFORE UPDATE ON tool_versions
-    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-```
-
-| Field | Type | Constraints | Description |
-|-------|------|-------------|-------------|
-| `id` | `UUID` | PK | Surrogate key |
-| `tool_id` | `UUID` | FK → `tools.id`, CASCADE | Parent tool |
-| `version_string` | `VARCHAR(128)` | NOT NULL | Semver or version label (e.g., `4.4.0`) |
-| `release_date` | `DATE` | nullable | Release date |
-| `is_latest` | `BOOLEAN` | NOT NULL, default `FALSE` | Marks the current recommended version |
-| `changelog_url` | `VARCHAR(2048)` | nullable | Link to release notes |
-| `created_at` | `TIMESTAMPTZ` | NOT NULL | |
-| `updated_at` | `TIMESTAMPTZ` | NOT NULL | Auto-updated |
-
-> **Business rule:** Only one `tool_versions` row per `tool_id` may have `is_latest = TRUE`. Enforced via partial unique index and application logic. See §7.
-
----
-
-### 3.6 `tool_capabilities`
+### 3.5 `tool_capabilities`
 
 Describes what a tool can do: named capability + protocol and OS support vectors.
 
@@ -515,42 +475,7 @@ CREATE INDEX idx_tool_capabilities_os        ON tool_capabilities USING gin (os_
 
 ---
 
-### 3.7 `tool_integrations`
-
-Declares a directed integration relationship between two tools.
-
-```sql
-CREATE TABLE tool_integrations (
-    id                      UUID                PRIMARY KEY DEFAULT gen_random_uuid(),
-    tool_id                 UUID                NOT NULL REFERENCES tools(id) ON DELETE CASCADE,
-    integrates_with_tool_id UUID                NOT NULL REFERENCES tools(id) ON DELETE CASCADE,
-    integration_type        integration_type    NOT NULL,
-    notes                   TEXT,
-    created_at              TIMESTAMPTZ         NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT tool_integrations_no_self_loop   CHECK (tool_id <> integrates_with_tool_id),
-    CONSTRAINT tool_integrations_unique         UNIQUE (tool_id, integrates_with_tool_id, integration_type)
-);
-
-CREATE INDEX idx_tool_integrations_tool_id               ON tool_integrations (tool_id);
-CREATE INDEX idx_tool_integrations_integrates_with       ON tool_integrations (integrates_with_tool_id);
-CREATE INDEX idx_tool_integrations_type                  ON tool_integrations (integration_type);
-```
-
-| Field | Type | Constraints | Description |
-|-------|------|-------------|-------------|
-| `id` | `UUID` | PK | Surrogate key |
-| `tool_id` | `UUID` | FK → `tools.id` | The tool that exposes or initiates the integration |
-| `integrates_with_tool_id` | `UUID` | FK → `tools.id` | The tool being integrated with |
-| `integration_type` | `integration_type` enum | NOT NULL | Nature of the integration |
-| `notes` | `TEXT` | nullable | Context, links to docs, known limitations |
-| `created_at` | `TIMESTAMPTZ` | NOT NULL | |
-
-> The relationship is directed. If Ansible integrates with Netmiko (Ansible calls Netmiko), record `tool_id=ansible, integrates_with_tool_id=netmiko`. Bidirectional relationships require two rows.
-
----
-
-### 3.8 `tool_dependencies`
+### 3.6 `tool_dependencies`
 
 Tracks explicit package/tool dependencies.
 
@@ -582,7 +507,7 @@ CREATE INDEX idx_tool_dependencies_depends_on       ON tool_dependencies (depend
 
 ---
 
-### 3.9 `environments`
+### 3.7 `environments`
 
 Named compute environments with platform classification.
 
@@ -623,7 +548,7 @@ CREATE TABLE environments (
 
 ---
 
-### 3.10 `tool_environment_support`
+### 3.8 `tool_environment_support`
 
 Records how to install a tool in a given environment.
 
@@ -660,29 +585,73 @@ CREATE TRIGGER trg_tes_updated_at
 
 ---
 
-### 3.11 `tool_naf_function_map`
+### 3.9 `contacts`
 
-Maps tools to their NAF framework functional roles. A tool may fill multiple roles (e.g., SuzieQ is both `collector` and `observability`).
+A person who has deployed or used a tool in a real environment. Contacts can be listed publicly as community references for a tool. A single contact can be linked to multiple tools.
 
 ```sql
-CREATE TABLE tool_naf_function_map (
-    tool_id      UUID          NOT NULL REFERENCES tools(id) ON DELETE CASCADE,
-    naf_function naf_function  NOT NULL,
+CREATE TABLE contacts (
+    id          UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
+    name        VARCHAR(255)    NOT NULL,
+    org         VARCHAR(255),
+    role        VARCHAR(255),
+    contact_url VARCHAR(2048),
+    is_public   BOOLEAN         NOT NULL DEFAULT TRUE,
+    notes       TEXT,
+    created_at  TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
 
-    PRIMARY KEY (tool_id, naf_function)
+    CONSTRAINT contacts_name_not_empty CHECK (char_length(name) > 0)
 );
 
-CREATE INDEX idx_tool_naf_function_map_function ON tool_naf_function_map (naf_function);
+CREATE INDEX idx_contacts_public ON contacts (is_public) WHERE is_public = TRUE;
+
+CREATE TRIGGER trg_contacts_updated_at
+    BEFORE UPDATE ON contacts
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+```
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | `UUID` | PK | Surrogate key |
+| `name` | `VARCHAR(255)` | NOT NULL, non-empty | Display name or handle (e.g., `"Jane Smith"`, `"jsmith42"`) |
+| `org` | `VARCHAR(255)` | nullable | Organization or employer |
+| `role` | `VARCHAR(255)` | nullable | Job title (e.g., `"Network Automation Engineer"`) |
+| `contact_url` | `VARCHAR(2048)` | nullable | GitHub profile, LinkedIn, personal site, or similar public link |
+| `is_public` | `BOOLEAN` | NOT NULL, default `TRUE` | Controls whether this contact appears in public API responses |
+| `notes` | `TEXT` | nullable | Internal notes — not exposed via the public API |
+| `created_at` | `TIMESTAMPTZ` | NOT NULL | |
+| `updated_at` | `TIMESTAMPTZ` | NOT NULL | Auto-updated |
+
+---
+
+### 3.10 `tool_contact_map`
+
+Many-to-many join between tools and contacts. Records which tools a contact has used, with a brief description of their deployment context.
+
+```sql
+CREATE TABLE tool_contact_map (
+    tool_id     UUID        NOT NULL REFERENCES tools(id) ON DELETE CASCADE,
+    contact_id  UUID        NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+    use_case    TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    PRIMARY KEY (tool_id, contact_id)
+);
+
+CREATE INDEX idx_tool_contact_map_contact ON tool_contact_map (contact_id);
 ```
 
 | Field | Type | Constraints | Description |
 |-------|------|-------------|-------------|
 | `tool_id` | `UUID` | FK → `tools.id`, CASCADE DELETE, PK composite | The tool |
-| `naf_function` | `naf_function` enum | NOT NULL, PK composite | The NAF functional role |
+| `contact_id` | `UUID` | FK → `contacts.id`, CASCADE DELETE, PK composite | The contact/reference person |
+| `use_case` | `TEXT` | nullable | How this person uses the tool (e.g., `"Production BGP route collector"`, `"Lab automation with Nornir"`) |
+| `created_at` | `TIMESTAMPTZ` | NOT NULL | When this reference was added |
 
 ---
 
-### 3.12 `data_sources`
+### 3.11 `data_sources`
 
 Catalog of sources from which tools are discovered or submitted. Used for data provenance.
 
@@ -721,7 +690,7 @@ CREATE TABLE data_sources (
 
 ---
 
-### 3.13 `tool_source_map`
+### 3.12 `tool_source_map`
 
 Many-to-many join recording which data sources reference each tool. This is the provenance record: it answers *"how did this tool get into the registry?"*
 
@@ -751,7 +720,7 @@ CREATE INDEX idx_tool_source_map_source ON tool_source_map (source_id);
 
 ---
 
-### 3.14 `api_keys`
+### 3.13 `api_keys`
 
 Stores hashed admin API keys for authenticating write operations. The raw key is never persisted — only its SHA-256 hash.
 
@@ -802,18 +771,7 @@ CREATE INDEX idx_api_keys_active ON api_keys (is_active) WHERE is_active = TRUE;
 | `plugin` | Extension to a host tool | Ansible collection, Nornir plugin |
 | `framework` | Scaffolding or composition layer | Nornir (as framework), Cookiecutter |
 
-### 4.2 `integration_type`
-
-| Value | Description |
-|-------|-------------|
-| `native` | First-party, officially documented integration |
-| `plugin` | Delivered as a plugin/module (e.g., Ansible collection) |
-| `api` | Two tools communicate over REST or gRPC |
-| `mcp` | Integration via Model Context Protocol server |
-| `wrapper` | One tool embeds or wraps another (calls it as subprocess/lib) |
-| `informal` | Community-known coupling without official support |
-
-### 4.3 `dependency_type`
+### 4.2 `dependency_type`
 
 | Value | Description |
 |-------|-------------|
@@ -894,6 +852,7 @@ The six functional roles from the Network Automation Framework (NAF). A tool may
 | `collector` | Gathers current device state via SSH, gNMI, SNMP, or streaming telemetry | SuzieQ, Elastiflow |
 | `orchestration` | Coordinates multi-step workflows and event-driven automation | Ansible, Nornir, AWX |
 | `executor` | Applies configuration changes directly to network devices | Netmiko, Scrapli, Ansible |
+| `infrastructure` | Provides the lab/emulation environment — underlying network fabric for testing | containerlab, GNS3, EVE-NG |
 
 ---
 
@@ -931,20 +890,14 @@ All responses follow the envelope:
 |--------|------|------|-------------|
 | `GET` | `/api/v1/tools` | — | List all tools (paginated, filterable) |
 | `GET` | `/api/v1/tools/{slug}` | — | Get tool detail by slug |
-| `GET` | `/api/v1/tools/{slug}/versions` | — | List versions for a tool |
 | `GET` | `/api/v1/tools/{slug}/capabilities` | — | List capabilities for a tool |
-| `GET` | `/api/v1/tools/{slug}/integrations` | — | List integrations (in + out) for a tool |
 | `GET` | `/api/v1/tools/{slug}/dependencies` | — | List dependencies for a tool |
 | `GET` | `/api/v1/tools/{slug}/environments` | — | List environment support records |
 | `POST` | `/api/v1/tools` | **admin** | Create a tool record |
 | `PATCH` | `/api/v1/tools/{slug}` | **admin** | Update a tool record |
 | `DELETE` | `/api/v1/tools/{slug}` | **admin** | Delete a tool (cascades to all sub-resources) |
-| `POST` | `/api/v1/tools/{slug}/versions` | **admin** | Add a version to a tool |
-| `DELETE` | `/api/v1/tools/{slug}/versions/{version_string}` | **admin** | Remove a specific version |
 | `POST` | `/api/v1/tools/{slug}/capabilities` | **admin** | Add a capability to a tool |
 | `DELETE` | `/api/v1/tools/{slug}/capabilities/{id}` | **admin** | Remove a capability |
-| `POST` | `/api/v1/tools/{slug}/integrations` | **admin** | Declare an integration edge |
-| `DELETE` | `/api/v1/tools/{slug}/integrations/{id}` | **admin** | Remove an integration edge |
 | `POST` | `/api/v1/tools/{slug}/dependencies` | **admin** | Declare a dependency edge |
 | `DELETE` | `/api/v1/tools/{slug}/dependencies/{id}` | **admin** | Remove a dependency edge |
 | `POST` | `/api/v1/tools/{slug}/environments` | **admin** | Add environment support |
@@ -976,10 +929,24 @@ All responses follow the envelope:
 
 #### NAF Framework Functions
 
+NAF functions are stored as an array column on `tools`; these endpoints provide convenience filtering.
+
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `GET` | `/api/v1/naf-functions` | — | List all 6 NAF framework functions with descriptions |
-| `GET` | `/api/v1/naf-functions/{function}/tools` | — | List tools tagged with a given NAF function |
+| `GET` | `/api/v1/naf-functions` | — | List all 7 NAF framework functions with descriptions (includes `infrastructure`) |
+| `GET` | `/api/v1/naf-functions/{function}/tools` | — | List tools where `naf_function = ANY(naf_functions)` |
+
+#### Contacts (Community References)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/tools/{slug}/references` | — | List public contacts who have used this tool |
+| `POST` | `/api/v1/tools/{slug}/references` | **admin** | Link an existing contact to this tool |
+| `DELETE` | `/api/v1/tools/{slug}/references/{contact_id}` | **admin** | Remove a contact reference from a tool |
+| `GET` | `/api/v1/contacts` | **admin** | List all contacts (includes non-public) |
+| `POST` | `/api/v1/contacts` | **admin** | Create a new contact record |
+| `PATCH` | `/api/v1/contacts/{id}` | **admin** | Update contact details |
+| `DELETE` | `/api/v1/contacts/{id}` | **admin** | Delete a contact (cascades to all `tool_contact_map` entries) |
 
 #### Data Sources
 
@@ -1014,7 +981,8 @@ All endpoints in this group require `Authorization: Bearer <key>`.
 | `category` | string (slug) | Filter by category slug | `?category=network-simulation` |
 | `protocol` | string (enum) | Filter by `protocol_support` value | `?protocol=gNMI` |
 | `environment` | string (slug) | Filter by environment slug | `?environment=macos-arm64` |
-| `naf_function` | string (enum) | Filter by NAF framework function | `?naf_function=executor` |
+| `naf_function` | string (enum) | Filter by NAF framework function (`= ANY(naf_functions)`) | `?naf_function=executor` |
+| `business_model` | string (enum) | Filter by business/licensing model | `?business_model=full-open-source` |
 | `source` | string (slug) | Filter by data source slug | `?source=steinzi` |
 | `sort` | string | Sort field (default: `name`) | `?sort=updated_at` |
 | `order` | `asc\|desc` | Sort direction (default: `asc`) | `?order=desc` |
@@ -1042,28 +1010,14 @@ WHERE 'gNMI' = ANY(tc.protocol_support)
   AND e.slug = 'macos-arm64'
   AND t.status = 'active';
 
--- Q2: All tools that integrate with a specific tool (by slug)
-SELECT t2.name, ti.integration_type, ti.notes
-FROM tool_integrations ti
-JOIN tools t1 ON t1.id = ti.tool_id
-JOIN tools t2 ON t2.id = ti.integrates_with_tool_id
-WHERE t1.slug = 'ansible';
-
--- Q3: Dependency graph for a tool (direct deps only)
+-- Q2: Dependency graph for a tool (direct deps only)
 SELECT dep.name, td.dependency_type, td.version_constraint
 FROM tool_dependencies td
 JOIN tools dep ON dep.id = td.depends_on_tool_id
 JOIN tools t   ON t.id  = td.tool_id
 WHERE t.slug = 'suzieq';
 
--- Q4: Latest version of each active tool
-SELECT t.slug, tv.version_string, tv.release_date
-FROM tools t
-JOIN tool_versions tv ON tv.tool_id = t.id AND tv.is_latest = TRUE
-WHERE t.status = 'active'
-ORDER BY t.name;
-
--- Q5: Install command for a tool in a specific environment
+-- Q3: Install command for a tool in a specific environment
 SELECT tes.install_method, tes.install_command, tes.notes
 FROM tool_environment_support tes
 JOIN tools t ON t.id = tes.tool_id
@@ -1071,20 +1025,27 @@ JOIN environments e ON e.id = tes.environment_id
 WHERE t.slug = 'containerlab'
   AND e.slug = 'ubuntu-2204';
 
--- Q6: All active tools with a specific NAF framework function
-SELECT t.slug, t.name, t.tool_type
-FROM tools t
-JOIN tool_naf_function_map m ON m.tool_id = t.id
-WHERE m.naf_function = 'executor'
-  AND t.status = 'active'
-ORDER BY t.name;
+-- Q4: All active tools with a specific NAF framework function (array column, no join needed)
+SELECT slug, name, tool_type, naf_functions
+FROM tools
+WHERE 'executor' = ANY(naf_functions)
+  AND status = 'active'
+ORDER BY name;
 
--- Q7: All data sources for a tool (provenance lookup)
+-- Q5: All data sources for a tool (provenance lookup)
 SELECT ds.name, ds.url, tsm.notes, tsm.created_at
 FROM tool_source_map tsm
 JOIN data_sources ds ON ds.id = tsm.source_id
 JOIN tools t ON t.id = tsm.tool_id
 WHERE t.slug = 'suzieq';
+
+-- Q6: Public community references for a tool
+SELECT c.name, c.org, c.role, c.contact_url, tcm.use_case
+FROM tool_contact_map tcm
+JOIN contacts c ON c.id = tcm.contact_id
+JOIN tools t ON t.id = tcm.tool_id
+WHERE t.slug = 'netmiko'
+  AND c.is_public = TRUE;
 ```
 
 ---
@@ -1103,7 +1064,7 @@ WHERE t.slug = 'suzieq';
     "repo_url": "https://github.com/ktbyers/netmiko",
     "license": "MIT",
     "status": "active",
-    "latest_version": "4.4.0",
+    "business_model": "full-open-source",
     "categories": ["scripting", "configuration-management"],
     "naf_functions": ["executor"],
     "capabilities": [
@@ -1215,9 +1176,9 @@ The following SQL inserts provide seed records for the user's primary toolstack.
 
 ```sql
 -- ============================================================
--- SEED: tools
+-- SEED: tools (naf_functions and business_model included inline)
 -- ============================================================
-INSERT INTO tools (name, slug, description, tool_type, homepage_url, repo_url, license, status)
+INSERT INTO tools (name, slug, description, tool_type, homepage_url, repo_url, license, status, naf_functions, business_model)
 VALUES
 
   -- 1. Netmiko
@@ -1228,7 +1189,9 @@ VALUES
    'https://github.com/ktbyers/netmiko',
    'https://github.com/ktbyers/netmiko',
    'MIT',
-   'active'),
+   'active',
+   ARRAY['executor']::naf_function[],
+   'full-open-source'),
 
   -- 2. Ansible
   ('Ansible',
@@ -1238,7 +1201,9 @@ VALUES
    'https://www.ansible.com',
    'https://github.com/ansible/ansible',
    'GPL-3.0',
-   'active'),
+   'active',
+   ARRAY['orchestration','executor']::naf_function[],
+   'hybrid'),
 
   -- 3. Jinja2
   ('Jinja2',
@@ -1248,7 +1213,9 @@ VALUES
    'https://jinja.palletsprojects.com',
    'https://github.com/pallets/jinja',
    'BSD-3-Clause',
-   'active'),
+   'active',
+   ARRAY['intent']::naf_function[],
+   'full-open-source'),
 
   -- 4. SuzieQ
   ('SuzieQ',
@@ -1258,7 +1225,9 @@ VALUES
    'https://www.stardustsystems.net/suzieq',
    'https://github.com/netenglabs/suzieq',
    'Apache-2.0',
-   'active'),
+   'active',
+   ARRAY['collector','observability']::naf_function[],
+   'full-open-source'),
 
   -- 5. containerlab
   ('containerlab',
@@ -1268,7 +1237,9 @@ VALUES
    'https://containerlab.dev',
    'https://github.com/srl-labs/containerlab',
    'BSD-2-Clause',
-   'active'),
+   'active',
+   ARRAY['infrastructure']::naf_function[],
+   'full-open-source'),
 
   -- 6. Infrahub
   ('Infrahub',
@@ -1278,7 +1249,9 @@ VALUES
    'https://www.opsmill.com/infrahub',
    'https://github.com/opsmill/infrahub',
    'Apache-2.0',
-   'active'),
+   'active',
+   ARRAY['intent']::naf_function[],
+   'hybrid'),
 
   -- 7. Generic MCP Server (Network Automation)
   ('Network Automation MCP Server',
@@ -1288,7 +1261,9 @@ VALUES
    NULL,
    NULL,
    'MIT',
-   'experimental'),
+   'experimental',
+   ARRAY['presentation']::naf_function[],
+   'full-open-source'),
 
   -- 8. Nornir
   ('Nornir',
@@ -1298,7 +1273,9 @@ VALUES
    'https://nornir.readthedocs.io',
    'https://github.com/nornir-automation/nornir',
    'Apache-2.0',
-   'active');
+   'active',
+   ARRAY['orchestration','executor']::naf_function[],
+   'full-open-source');
 
 
 -- ============================================================
@@ -1369,67 +1346,6 @@ WHERE t.slug = 'infrahub' AND e.slug = 'ubuntu-2204';
 
 
 -- ============================================================
--- SEED: tool_versions (examples)
--- ============================================================
-INSERT INTO tool_versions (tool_id, version_string, release_date, is_latest, changelog_url)
-SELECT id, '4.4.0', '2024-08-01', TRUE,
-  'https://github.com/ktbyers/netmiko/blob/develop/CHANGELOG.md'
-FROM tools WHERE slug = 'netmiko';
-
-INSERT INTO tool_versions (tool_id, version_string, release_date, is_latest, changelog_url)
-SELECT id, '2.17.0', '2024-11-01', TRUE,
-  'https://github.com/ansible/ansible/blob/devel/changelogs/CHANGELOG-v2.17.rst'
-FROM tools WHERE slug = 'ansible';
-
-INSERT INTO tool_versions (tool_id, version_string, release_date, is_latest, changelog_url)
-SELECT id, '0.24.0', '2024-09-01', TRUE,
-  'https://github.com/netenglabs/suzieq/releases'
-FROM tools WHERE slug = 'suzieq';
-
-INSERT INTO tool_versions (tool_id, version_string, release_date, is_latest, changelog_url)
-SELECT id, '0.60.0', '2025-01-01', TRUE,
-  'https://github.com/srl-labs/containerlab/releases'
-FROM tools WHERE slug = 'containerlab';
-
-INSERT INTO tool_versions (tool_id, version_string, release_date, is_latest, changelog_url)
-SELECT id, '1.0.0-beta', '2024-12-01', TRUE,
-  'https://github.com/opsmill/infrahub/releases'
-FROM tools WHERE slug = 'infrahub';
-
-
--- ============================================================
--- SEED: tool_integrations (examples)
--- ============================================================
--- Ansible integrates with Netmiko (wrapper — network_cli connection)
-INSERT INTO tool_integrations (tool_id, integrates_with_tool_id, integration_type, notes)
-SELECT a.id, n.id, 'wrapper',
-  'Ansible network_cli connection plugin uses Netmiko under the hood for SSH connectivity to network devices.'
-FROM tools a, tools n
-WHERE a.slug = 'ansible' AND n.slug = 'netmiko';
-
--- Nornir integrates with Netmiko (plugin)
-INSERT INTO tool_integrations (tool_id, integrates_with_tool_id, integration_type, notes)
-SELECT nr.id, nm.id, 'plugin',
-  'nornir_netmiko plugin provides Nornir tasks wrapping Netmiko send_command and send_config_set.'
-FROM tools nr, tools nm
-WHERE nr.slug = 'nornir' AND nm.slug = 'netmiko';
-
--- MCP server integrates with SuzieQ (api)
-INSERT INTO tool_integrations (tool_id, integrates_with_tool_id, integration_type, notes)
-SELECT m.id, s.id, 'api',
-  'MCP server exposes SuzieQ REST API as tool calls for LLM-driven network state queries.'
-FROM tools m, tools s
-WHERE m.slug = 'network-automation-mcp' AND s.slug = 'suzieq';
-
--- MCP server integrates with Infrahub (api)
-INSERT INTO tool_integrations (tool_id, integrates_with_tool_id, integration_type, notes)
-SELECT m.id, i.id, 'api',
-  'MCP server queries Infrahub GraphQL/gRPC API to expose SoT data to AI agents.'
-FROM tools m, tools i
-WHERE m.slug = 'network-automation-mcp' AND i.slug = 'infrahub';
-
-
--- ============================================================
 -- SEED: data_sources
 -- ============================================================
 INSERT INTO data_sources (name, slug, url, description)
@@ -1451,43 +1367,37 @@ VALUES
 
 
 -- ============================================================
--- SEED: tool_naf_function_map
--- NAF function assignments derived from tools.yml framework_functions
+-- SEED: contacts (example community references)
 -- ============================================================
--- Netmiko: executes config changes over SSH
-INSERT INTO tool_naf_function_map (tool_id, naf_function)
-SELECT id, 'executor' FROM tools WHERE slug = 'netmiko';
+INSERT INTO contacts (name, org, role, contact_url, is_public, notes)
+VALUES
+  ('Alice Network',
+   'Example Corp',
+   'Network Automation Lead',
+   'https://github.com/example-alice',
+   TRUE,
+   'Example contact — replace with real references'),
 
--- Ansible: orchestrates workflows and executes changes
-INSERT INTO tool_naf_function_map (tool_id, naf_function)
-SELECT id, f FROM tools, (VALUES ('orchestration'), ('executor')) AS v(f)
-WHERE slug = 'ansible';
+  ('Bob Ops',
+   'Demo ISP',
+   'Senior Network Engineer',
+   'https://linkedin.com/in/example-bob',
+   TRUE,
+   'Example contact — replace with real references');
 
--- Jinja2: intent layer — renders config templates
-INSERT INTO tool_naf_function_map (tool_id, naf_function)
-SELECT id, 'intent' FROM tools WHERE slug = 'jinja2';
 
--- SuzieQ: collects state from devices and provides observability queries
-INSERT INTO tool_naf_function_map (tool_id, naf_function)
-SELECT id, f FROM tools, (VALUES ('collector'), ('observability')) AS v(f)
-WHERE slug = 'suzieq';
+-- ============================================================
+-- SEED: tool_contact_map (example references)
+-- ============================================================
+INSERT INTO tool_contact_map (tool_id, contact_id, use_case)
+SELECT t.id, c.id, 'Production device configuration push across 200+ Cisco and Arista nodes'
+FROM tools t, contacts c
+WHERE t.slug = 'netmiko' AND c.name = 'Alice Network';
 
--- containerlab: orchestrates lab topologies
-INSERT INTO tool_naf_function_map (tool_id, naf_function)
-SELECT id, 'orchestration' FROM tools WHERE slug = 'containerlab';
-
--- Infrahub: intent layer — source of truth and desired state
-INSERT INTO tool_naf_function_map (tool_id, naf_function)
-SELECT id, 'intent' FROM tools WHERE slug = 'infrahub';
-
--- Network Automation MCP Server: presentation layer — AI/agent interface
-INSERT INTO tool_naf_function_map (tool_id, naf_function)
-SELECT id, 'presentation' FROM tools WHERE slug = 'network-automation-mcp';
-
--- Nornir: orchestrates tasks and executes them against devices
-INSERT INTO tool_naf_function_map (tool_id, naf_function)
-SELECT id, f FROM tools, (VALUES ('orchestration'), ('executor')) AS v(f)
-WHERE slug = 'nornir';
+INSERT INTO tool_contact_map (tool_id, contact_id, use_case)
+SELECT t.id, c.id, 'Network lab topology automation for testing BGP route policies'
+FROM tools t, contacts c
+WHERE t.slug = 'containerlab' AND c.name = 'Bob Ops';
 
 
 -- ============================================================
@@ -1546,53 +1456,32 @@ WHERE t.slug = 'nornir' AND ds.slug = 'steinzi';
 | `tools` | `slug` UNIQUE | No two tools share a slug |
 | `tool_categories` | `slug` UNIQUE | No two categories share a slug |
 | `environments` | `slug` UNIQUE | No two environments share a slug |
-| `tool_versions` | `(tool_id, version_string)` UNIQUE | No duplicate version strings per tool |
-| `tool_integrations` | `(tool_id, integrates_with_tool_id, integration_type)` UNIQUE | No duplicate integration edges of the same type |
 | `tool_dependencies` | `(tool_id, depends_on_tool_id, dependency_type)` UNIQUE | No duplicate dependency edges of the same type |
 | `tool_environment_support` | `(tool_id, environment_id)` PRIMARY KEY | One install record per tool/env pair |
 | `tool_category_map` | `(tool_id, category_id)` PRIMARY KEY | No duplicate category assignments |
-| `tool_naf_function_map` | `(tool_id, naf_function)` PRIMARY KEY | No duplicate NAF function assignments per tool |
+| `tools` | `naf_functions` GIN index | Efficient `= ANY()` filtering on NAF function array column |
+| `contacts` | `name` non-empty CHECK | Contact name must not be blank |
+| `tool_contact_map` | `(tool_id, contact_id)` PRIMARY KEY | No duplicate contact references per tool |
 | `data_sources` | `slug` UNIQUE | No two sources share a slug |
 | `tool_source_map` | `(tool_id, source_id)` PRIMARY KEY | No duplicate source assignments per tool |
 | `api_keys` | `key_hash` UNIQUE | No two keys share the same hash |
 
 ### 7.2 Referential Integrity
 
-- All foreign keys use `ON DELETE CASCADE` for join tables and child records (e.g., `tool_versions`, `tool_capabilities`).
-- Self-referential foreign keys on `tool_integrations` and `tool_dependencies` use `ON DELETE CASCADE` — deleting a tool removes all its edges.
+- All foreign keys use `ON DELETE CASCADE` for join tables and child records (e.g., `tool_capabilities`, `tool_dependencies`).
 - `tool_category_map` cascades on both sides — deleting a category removes all tool-category associations.
-- `DELETE /api/v1/tools/{slug}` cascades to all sub-resources: versions, capabilities, integrations, dependencies, environment support, NAF function map, and source map entries.
+- `DELETE /api/v1/tools/{slug}` cascades to all sub-resources: capabilities, dependencies, environment support, contact references, and source map entries.
 - `DELETE /api/v1/sources/{slug}` is blocked at the DB level (`ON DELETE RESTRICT`) if any `tool_source_map` rows reference the source. The API layer translates this into `409 Conflict` with a message indicating how many tools must be reassigned first.
 
 ### 7.3 Self-Loop Prevention
 
-Both `tool_integrations` and `tool_dependencies` enforce `CHECK (tool_id <> integrates_with_tool_id)` and `CHECK (tool_id <> depends_on_tool_id)` respectively. A tool cannot integrate with or depend on itself.
+`tool_dependencies` enforces `CHECK (tool_id <> depends_on_tool_id)`. A tool cannot depend on itself.
 
-### 7.4 Versioning Policy
-
-**Rule V1 — Single latest version per tool:**
-At most one `tool_versions` row per `tool_id` may have `is_latest = TRUE`. This is enforced by:
-
-1. A partial unique index:
-   ```sql
-   CREATE UNIQUE INDEX idx_tool_versions_one_latest
-       ON tool_versions (tool_id)
-       WHERE is_latest = TRUE;
-   ```
-
-2. Application logic: when marking a new version as latest, the service layer must first `UPDATE tool_versions SET is_latest = FALSE WHERE tool_id = $1`, then insert/update the new record — both in a single transaction.
-
-**Rule V2 — Version strings are immutable:**
-Once a `tool_versions` row is created, `version_string` must not be updated. Corrections require deleting and re-inserting the record.
-
-**Rule V3 — Version strings are not validated for semver:**
-`version_string` is free-text to accommodate tools that use non-semver versioning (e.g., `2024.12`, `0.60.0-alpha`, `ansible-core 2.17`).
-
-### 7.5 Slug Immutability
+### 7.4 Slug Immutability
 
 Once published, `slug` values on `tools`, `tool_categories`, and `environments` must not change. Slugs are used as stable external identifiers in API paths, seed data, and MCP tool references. Renaming a slug requires a migration with explicit redirect mapping.
 
-### 7.6 Status Transitions
+### 7.5 Status Transitions
 
 Permitted status transitions (enforced by application layer, not DB):
 
@@ -1603,7 +1492,7 @@ deprecated  → archived
 archived    → (terminal — no transitions out without admin override)
 ```
 
-### 7.7 Data Provenance Rules
+### 7.6 Data Provenance Rules
 
 **Rule S1 — Every tool must have at least one data source:**
 The application layer MUST reject `POST /api/v1/tools` requests where `sources` is absent or empty. A tool with no `tool_source_map` entries is invalid. This cannot be enforced at the DB level via a `CHECK` constraint on a join table, so it is the API layer's responsibility to validate before committing.
@@ -1647,14 +1536,14 @@ Tags differ from categories in that they are not curated taxonomy — they are a
 
 ### 8.3 User Ratings & Community Notes
 
-A community layer for subjective tool evaluations:
+Community references are now supported via `contacts` + `tool_contact_map` (§3.11–§3.12). A richer evaluation layer could add:
 
 ```
-tool_reviews (id, tool_id, author_handle, rating INT CHECK 1..5, body TEXT, created_at)
-tool_notes   (id, tool_id, author_handle, body TEXT, created_at)
+tool_reviews (id, tool_id, contact_id, rating INT CHECK 1..5, body TEXT, created_at)
+tool_notes   (id, tool_id, contact_id, body TEXT, created_at)
 ```
 
-These would require a per-user identity layer beyond the single admin credential defined in §5.6 — out of scope for v1.
+This would reuse the `contacts` table for authorship, avoiding a separate identity layer. Still out of scope for v1.
 
 ### 8.4 MCP Server Integration for AI-Driven Tool Discovery
 

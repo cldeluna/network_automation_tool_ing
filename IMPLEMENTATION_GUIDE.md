@@ -18,6 +18,11 @@ Go to [supabase.com](https://supabase.com) and click **Start your project**. Sig
 3. Click **Create new project**
 4. Wait about 2 minutes while it provisions
 
+https://supabase.com/dashboard/project/pyerkodxqgooqiaelvyt
+
+Network Automation Tool.ing Personal Access Token
+sbp_9d3a••••••••••••••••••••••••••••••••0fc5
+
 > **Free tier note:** Projects pause automatically after 1 week of inactivity. You can unpause from the dashboard. Upgrade to Pro if you need it always-on.
 
 ### Step 3 — Get your connection string
@@ -79,7 +84,9 @@ You will add `fastapi` and `uvicorn` later when building the REST API.
 
 Open your Supabase project and click **SQL Editor** in the left sidebar.
 
-Run the DDL from `automation_tools_schema_spec.md` in four passes. Each pass is a separate query tab — click **Run** after pasting each one.
+**DDL** (Data Definition Language) is the SQL that creates the database structure — enum types, tables, indexes, and triggers. Nothing is stored in the database until you run it.
+
+Run the DDL from `automation_tools_schema_spec.md` in three passes. Each pass is a separate query tab in the Supabase SQL Editor — click **Run** after pasting each one.
 
 ### Step 7 — Run: Enum types (§3.1)
 
@@ -87,7 +94,7 @@ Open `automation_tools_schema_spec.md` and copy the entire SQL code block under 
 
 Expected result: `Success. No rows returned.`
 
-### Step 8 — Run: Tables (§3.2 through §3.14)
+### Step 8 — Run: Tables (§3.2 through §3.13)
 
 For each section below, copy its SQL code block from the spec and run it. Go in order — some tables have foreign keys that reference earlier ones.
 
@@ -96,16 +103,15 @@ For each section below, copy its SQL code block from the spec and run it. Go in 
 | §3.2 | `tools` — also creates the `set_updated_at()` trigger function |
 | §3.3 | `tool_categories` |
 | §3.4 | `tool_category_map` |
-| §3.5 | `tool_versions` |
-| §3.6 | `tool_capabilities` |
-| §3.7 | `tool_integrations` |
-| §3.8 | `tool_dependencies` |
-| §3.9 | `environments` |
-| §3.10 | `tool_environment_support` |
-| §3.11 | `tool_naf_function_map` |
-| §3.12 | `data_sources` |
-| §3.13 | `tool_source_map` |
-| §3.14 | `api_keys` |
+| §3.5 | `tool_capabilities` |
+| §3.6 | `tool_dependencies` |
+| §3.7 | `environments` |
+| §3.8 | `tool_environment_support` |
+| §3.9 | `contacts` |
+| §3.10 | `tool_contact_map` |
+| §3.11 | `data_sources` |
+| §3.12 | `tool_source_map` |
+| §3.13 | `api_keys` |
 
 Each should return `Success. No rows returned.`
 
@@ -113,7 +119,7 @@ Each should return `Success. No rows returned.`
 
 In `automation_tools_schema_spec.md`, find `## 6. Seed Data Examples` and copy the entire SQL block. Run it in the SQL Editor.
 
-This inserts the 8 seed tools, categories, environments, capabilities, versions, integrations, NAF function assignments, data sources, and source provenance records.
+This inserts: 8 tools (with `naf_functions` and `business_model` inline), seed categories, seed environments, example capabilities, example dependencies, example contacts, data sources, and source provenance records.
 
 ---
 
@@ -241,12 +247,89 @@ You now have:
 - A live PostgreSQL database on Supabase with the full schema
 - An admin API key stored securely in `.env`
 - The `create-admin-key` CLI command for minting additional keys
+- A full REST API — see Part 7 below
 
-The next step is building the REST API (`/api/v1/tools`, etc.) using **FastAPI**. Dependencies to add when ready:
+---
+
+## Part 7 — REST API
+
+The REST API is implemented in `api.py` using FastAPI. All routes are under `/api/v1`.
+
+### Step 17 — Start the server
 
 ```bash
-uv add fastapi uvicorn
+uv run python main.py serve
 ```
+
+The server starts on `http://127.0.0.1:8000`. Hot-reload is enabled by default.
+
+### Step 18 — Explore the interactive docs
+
+Open `http://127.0.0.1:8000/docs` in your browser. You'll see every endpoint, its request/response schema, and a **Try it out** button.
+
+To authorize write requests in the docs UI: click **Authorize** at the top right and enter your `NART_ADMIN_KEY` as the Bearer token.
+
+### Step 19 — Create a tool via the API
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/v1/tools \
+  -H "Authorization: Bearer <your-key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Batfish",
+    "slug": "batfish",
+    "tool_type": "platform",
+    "description": "Network configuration analysis and verification",
+    "repo_url": "https://github.com/batfish/batfish",
+    "status": "active",
+    "naf_functions": ["observability"],
+    "business_model": "full-open-source",
+    "sources": ["manual"]
+  }'
+```
+
+Returns `201 Created` with the full tool object. The `sources` field is required and must contain at least one known source slug — the API rejects tools with no provenance.
+
+### Step 20 — Update a tool's status
+
+Status transitions are enforced by the API layer:
+
+| From | Allowed transitions |
+|------|---------------------|
+| `active` | `deprecated`, `archived`, `experimental` |
+| `experimental` | `active`, `archived` |
+| `deprecated` | `archived` |
+| `archived` | *(terminal — no transitions)* |
+
+```bash
+curl -s -X PATCH http://127.0.0.1:8000/api/v1/tools/batfish \
+  -H "Authorization: Bearer <your-key>" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "deprecated"}'
+```
+
+Returns `409 Conflict` if the transition is invalid.
+
+### Write endpoint summary
+
+All non-`GET` endpoints require `Authorization: Bearer <key>`.
+
+| Resource | Create | Update | Delete |
+|----------|--------|--------|--------|
+| Tools | `POST /api/v1/tools` | `PATCH /api/v1/tools/{slug}` | `DELETE /api/v1/tools/{slug}` |
+| Capabilities | `POST /api/v1/tools/{slug}/capabilities` | — | `DELETE /api/v1/tools/{slug}/capabilities/{id}` |
+| Dependencies | `POST /api/v1/tools/{slug}/dependencies` | — | `DELETE /api/v1/tools/{slug}/dependencies/{id}` |
+| Env support | `POST /api/v1/tools/{slug}/environments` | — | `DELETE /api/v1/tools/{slug}/environments/{env_slug}` |
+| References | `POST /api/v1/tools/{slug}/references` | — | `DELETE /api/v1/tools/{slug}/references/{contact_id}` |
+| Categories | `POST /api/v1/categories` | — | `DELETE /api/v1/categories/{slug}` |
+| Environments | `POST /api/v1/environments` | — | `DELETE /api/v1/environments/{slug}` |
+| Contacts | `POST /api/v1/contacts` | `PATCH /api/v1/contacts/{id}` | `DELETE /api/v1/contacts/{id}` |
+| Sources | `POST /api/v1/sources` | — | `DELETE /api/v1/sources/{slug}` |
+| Admin keys | `POST /api/v1/admin/keys` | — | `DELETE /api/v1/admin/keys/{id}` (soft revoke) |
+
+> **Slug immutability:** Slugs on tools, categories, environments, and data sources are stable external identifiers and cannot be changed after creation.
+
+> **Source deletion:** `DELETE /api/v1/sources/{slug}` returns `409` if any tools still reference that source. Reassign or delete those tools first.
 
 ---
 
@@ -268,10 +351,8 @@ The Supabase MCP server lets Claude interact with your database directly — run
 4. Click **Generate new token**
 5. Give it a name (e.g., `claude-code`) and click **Generate**
 6. Copy the token — it starts with `sbp_`
-7. Add it to your `.env` file:
-   ```
-   SUPABASE_ACCESS_TOKEN=sbp_...
-   ```
+
+You will paste this token directly into `.mcp.json` in Step 16. Do **not** add it to `.env` — `.mcp.json` is already in `.gitignore` and is the right place for it.
 
 ### Step 15 — Get your Project ID
 

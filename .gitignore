@@ -18,3 +18,8 @@ wheels/
 
 # macOS
 .DS_Store
+.env
+.DS_Store
+__pycache__/
+*.pyc
+.python-version
