@@ -11,6 +11,12 @@ from db import get_conn
 
 app = FastAPI(title="Network Automation Registry", version="1.0.0")
 
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
 NAF_DESCRIPTIONS = {
     "presentation": "User-facing interfaces: dashboards, CLIs, chat bots",
     "intent": "Intent capture and translation: NLP, policy engines",

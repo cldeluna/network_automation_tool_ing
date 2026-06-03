@@ -1,0 +1,14 @@
+{
+  "builds": [
+    {
+      "src": "api.py",
+      "use": "@vercel/python",
+      "config": {
+        "includeFiles": ["auth.py", "db.py"]
+      }
+    }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "api.py" }
+  ]
+}
